@@ -305,3 +305,24 @@ officeguard-lab/
 ```
 
 ---
+
+## Git Workflow
+
+이 프로젝트는 기능 단위 브랜치와 PR 기반으로 변경 사항을 관리한다.
+
+```bash
+git checkout -b feature/xxx
+git add .
+git commit -m "feat: xxx"
+git push origin feature/xxx
+```
+
+### 기준
+
+* `main` 브랜치는 실행 가능한 상태로 유지한다.
+* 기능 추가, 구조 변경, 문서 수정은 별도 브랜치에서 진행한다.
+* PR 체크리스트 기반으로 변경 범위를 검증한다.
+* 런타임 파일, 로그 파일, 로컬 설정 파일은 Git에 포함하지 않는다.
+* 민감 정보, 토큰, 인증 정보, 개인 데이터는 저장소에 포함하지 않는다.
+
+---
