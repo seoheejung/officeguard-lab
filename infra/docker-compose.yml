@@ -1,0 +1,29 @@
+services:
+  backend:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+
+    container_name: officeguard-lab-backend
+
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+      PORT: ${PORT:-4000}
+
+    ports:
+      - "${PORT:-4000}:${PORT:-4000}"
+
+    restart: unless-stopped
+
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:' + process.env.PORT + '/health').then((response) => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))"
+        ]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s

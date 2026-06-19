@@ -1,0 +1,25 @@
+# Local dependencies
+node_modules
+
+# TypeScript build output
+dist
+
+# Local environment files
+.env
+.env.*
+!.env.example
+
+# Logs
+logs
+*.log
+pnpm-debug.log*
+
+# Git metadata
+.git
+.gitignore
+
+# Editor and OS files
+.vscode
+.idea
+.DS_Store
+Thumbs.db
