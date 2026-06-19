@@ -1,0 +1,33 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# Logs
+logs/
+*.log
+pnpm-debug.log*
+
+# Runtime data
+data/*
+!data/.gitkeep
+
+runtime/*
+!runtime/.gitkeep
+
+# Test and coverage output
+coverage/
+
+# Editor settings
+.vscode/
+.idea/
+
+# Operating system files
+.DS_Store
+Thumbs.db

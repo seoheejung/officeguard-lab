@@ -188,6 +188,71 @@ flowchart TD
 
 ---
 
+## 환경 변수
+
+Docker Compose 실행 시 `infra/.env` 파일을 사용한다.
+
+#### 예제 파일
+
+```env
+PORT=4000
+NODE_ENV=production
+```
+
+---
+
+## 실행 방법
+
+### 로컬 실행
+
+```powershell
+cd backend
+
+pnpm install
+pnpm typecheck
+pnpm dev
+```
+
+#### Health Check
+
+```powershell
+Invoke-RestMethod http://localhost:4000/health
+```
+
+### 빌드 실행
+
+```powershell
+cd backend
+
+pnpm build
+pnpm start
+```
+
+### Docker Compose 실행
+
+#### 프로젝트 루트에서 실행
+
+```powershell
+Copy-Item .\infra\.env.example .\infra\.env
+
+docker compose --env-file .\infra\.env -f .\infra\docker-compose.yml up --build -d
+docker compose --env-file .\infra\.env -f .\infra\docker-compose.yml ps
+```
+
+#### Health Check
+
+```powershell
+Invoke-RestMethod http://localhost:4000/health
+```
+
+#### 종료
+
+```powershell
+docker compose --env-file .\infra\.env -f .\infra\docker-compose.yml down
+```
+
+---
+
 ## 진행 단계
 
 ### Phase 1. 프로젝트 초기 구성
@@ -271,20 +336,20 @@ flowchart TD
 
 ---
 
-## 예상 디렉터리 구조
+## 디렉터리 구조
 
 ```text
 officeguard-lab/
  ├─ backend/
- │   └─ src/
- │       ├─ config/
- │       ├─ events/
- │       ├─ collectors/
- │       ├─ pipeline/
- │       ├─ analyzer/
- │       ├─ storage/
- │       ├─ websocket/
- │       └─ index.ts
+ │   ├─ src/
+ │   │   ├─ config/
+ │   │   │   └─ serverConfig.ts
+ │   │   └─ index.ts
+ │   ├─ .dockerignore
+ │   ├─ Dockerfile
+ │   ├─ package.json
+ │   ├─ pnpm-lock.yaml
+ │   └─ tsconfig.json
  │
  ├─ dashboard/
  │   └─ src/
@@ -293,6 +358,7 @@ officeguard-lab/
  │   └─ mock/
  │
  ├─ infra/
+ │   ├─ .env.example
  │   └─ docker-compose.yml
  │
  ├─ docs/
@@ -301,6 +367,7 @@ officeguard-lab/
  │   ├─ rules.md
  │   └─ privacy.md
  │
+ ├─ .gitignore
  └─ README.md
 ```
 

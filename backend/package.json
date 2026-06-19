@@ -1,0 +1,26 @@
+{
+  "name": "@officeguard-lab/backend",
+  "version": "1.0.0",
+  "private": true,
+  "description": "OfficeGuard Lab backend server",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "typecheck": "tsc --noEmit"
+  },
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "packageManager": "pnpm@10.34.3",
+  "dependencies": {
+    "express": "^5.2.1"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "@types/node": "^24.13.2",
+    "tsx": "^4.22.4",
+    "typescript": "^6.0.3"
+  }
+}
