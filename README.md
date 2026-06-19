@@ -343,7 +343,7 @@ officeguard-lab/
  ├─ backend/
  │   ├─ src/
  │   │   ├─ config/
- │   │   │   └─ serverConfig.ts
+ │   │   ├─ events/
  │   │   └─ index.ts
  │   ├─ .dockerignore
  │   ├─ Dockerfile
