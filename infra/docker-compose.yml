@@ -7,11 +7,12 @@ services:
     container_name: officeguard-lab-backend
 
     environment:
-      NODE_ENV: ${NODE_ENV:-production}
-      PORT: ${PORT:-4000}
+      NODE_ENV: ${NODE_ENV:?NODE_ENV is required}
+      PORT: ${PORT:?PORT is required}
+      MOCK_EVENT_INTERVAL_MS: ${MOCK_EVENT_INTERVAL_MS:?MOCK_EVENT_INTERVAL_MS is required}
 
     ports:
-      - "${PORT:-4000}:${PORT:-4000}"
+      - "${PORT:?PORT is required}:${PORT:?PORT is required}"
 
     restart: unless-stopped
 

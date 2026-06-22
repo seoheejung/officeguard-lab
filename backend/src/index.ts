@@ -1,6 +1,8 @@
 import express from 'express';
 
+import { mockEventConfig } from './config/mockEventConfig.js';
 import { serverConfig } from './config/serverConfig.js';
+import { startMockEventGenerator } from './mock/mockEventGenerator.js';
 
 const app = express();
 
@@ -20,8 +22,10 @@ app.get('/health', (_request, response) => {
 // Docker 컨테이너 외부에서도 접근할 수 있도록 모든 네트워크 인터페이스에 바인딩
 const server = app.listen(serverConfig.port, '0.0.0.0', () => {
   console.log(
-    `[server] ${serverConfig.serviceName} listening on http://localhost:${serverConfig.port}`,
+    `[server] ${serverConfig.serviceName} listening on port ${serverConfig.port}`,
   );
+
+  startMockEventGenerator(mockEventConfig.intervalMs);
 });
 
 // 포트 충돌 등 서버 시작 과정에서 발생한 오류를 실패 상태로 처리

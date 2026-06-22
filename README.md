@@ -91,14 +91,22 @@ flowchart TD
 
 ### Endpoint Event
 
-초기 단계에서는 mock event로 구현한다.
+초기 단계에서는 Mock Event Generator로 테스트 이벤트를 생성한다.
 
-* 프로세스 실행
-* 파일 생성/수정/삭제
-* 파일 복사
-* USB 연결
-* 프린트 요청
-* 외부 전송 의심 이벤트
+* 정상 DNS Query
+* USB 저장 장치 연결
+* USB 저장 장치로 파일 복사
+* 파일 복사 후 외부 전송 역할의 테스트 도메인 DNS Query
+
+Mock 이벤트는 일정 주기로 순차 생성되며, 이벤트마다 새로운 UUID와 timestamp를 사용한다.
+
+```text
+DNS_QUERY
+→ USB_CONNECTED
+→ FILE_COPIED
+→ DNS_QUERY
+→ 반복
+```
 
 ### Rule-based Detection
 
@@ -190,14 +198,18 @@ flowchart TD
 
 ## 환경 변수
 
-Docker Compose 실행 시 `infra/.env` 파일을 사용한다.
+로컬 실행과 Docker Compose 실행에 `infra/.env` 파일을 사용한다.
 
-#### 예제 파일
+| 환경 변수                    | 역할             |
+| ------------------------ | -------------- |
+| `NODE_ENV`               | 애플리케이션 실행 환경   |
+| `PORT`                   | Express 서버 포트  |
+| `MOCK_EVENT_INTERVAL_MS` | Mock 이벤트 생성 주기 |
 
-```env
-PORT=4000
-NODE_ENV=production
-```
+환경 변수는 모두 필수이며 코드 내부 기본값을 사용하지 않는다.
+
+실제 환경 변수 값은 README에 작성하지 않고 `infra/.env.example`에서 변수 항목만 관리한다.
+
 
 ---
 
@@ -255,14 +267,14 @@ docker compose --env-file .\infra\.env -f .\infra\docker-compose.yml down
 
 ## 진행 단계
 
-### Phase 1. 프로젝트 초기 구성
+### Phase 1. 프로젝트 초기 구성 ✅ 완료
 
 * Node.js + TypeScript 프로젝트 구성
 * pnpm 기반 패키지 관리
 * Docker Compose 구성
 * 기본 서버 및 health check API 구현
 
-### Phase 2. 이벤트 모델 정의
+### Phase 2. 이벤트 모델 정의 ✅ 완료
 
 * 공통 SecurityEvent 타입 정의
 * DNS event 정의
@@ -270,12 +282,16 @@ docker compose --env-file .\infra\.env -f .\infra\docker-compose.yml down
 * Endpoint event 정의
 * Rule hit event 정의
 
-### Phase 3. Mock Event Generator
+### Phase 3. Mock Event Generator ✅ 완료
 
-* DNS query mock event 생성
-* USB 연결 mock event 생성
-* 파일 복사 mock event 생성
-* 외부 도메인 접속 mock event 생성
+* 정상 DNS Query Mock 이벤트 생성
+* USB 연결 Mock 이벤트 생성
+* 파일 복사 Mock 이벤트 생성
+* 외부 전송 의심 도메인 DNS Query 생성
+* UUID 및 ISO 8601 timestamp 생성
+* 환경 변수 기반 생성 주기 설정
+* 이벤트 순차 반복 및 콘솔 출력
+* `RULE_HIT` 생성 제외
 
 ### Phase 4. Event Pipeline
 

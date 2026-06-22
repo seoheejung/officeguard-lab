@@ -5,9 +5,9 @@
   "description": "OfficeGuard Lab backend server",
   "type": "module",
   "scripts": {
-    "dev": "tsx src/index.ts",
+    "dev": "node --env-file=../infra/.env --import tsx src/index.ts",
     "build": "tsc",
-    "start": "node dist/index.js",
+    "start": "node --env-file=../infra/.env dist/index.js",
     "typecheck": "tsc --noEmit"
   },
   "engines": {
