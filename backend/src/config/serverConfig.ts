@@ -1,17 +1,24 @@
-const DEFAULT_PORT = 4000;
 const SERVICE_NAME = 'officeguard-lab-backend';
-const DEFAULT_NODE_ENV = 'development';
+
+type NodeEnvironment = 'development' | 'test' | 'production';
 
 /**
- * PORT 환경 변수를 서버에서 사용할 수 있는 포트 번호로 변환
- *
- * 환경 변수가 없으면 기본 포트 4000을 사용
+ * 필수 환경 변수 값 조회
  */
-const parsePort = (value: string | undefined): number => {
-  if (value === undefined) {
-    return DEFAULT_PORT;
+const getRequiredEnv = (name: string): string => {
+  const value = process.env[name];
+
+  if (value === undefined || value.trim() === '') {
+    throw new Error(`[config] ${name} is required`);
   }
 
+  return value.trim();
+};
+
+/**
+ * PORT 환경 변수를 서버에서 사용할 포트 번호로 변환
+ */
+const parsePort = (value: string): number => {
   const port = Number(value);
 
   if (!Number.isInteger(port) || port < 1 || port > 65_535) {
@@ -23,8 +30,25 @@ const parsePort = (value: string | undefined): number => {
   return port;
 };
 
+/**
+ * NODE_ENV 환경 변수 값 검증
+ */
+const parseNodeEnvironment = (value: string): NodeEnvironment => {
+  if (
+    value !== 'development' &&
+    value !== 'test' &&
+    value !== 'production'
+  ) {
+    throw new Error(
+      `[config] NODE_ENV must be development, test, or production. received=${value}`,
+    );
+  }
+
+  return value;
+};
+
 export const serverConfig = {
-  port: parsePort(process.env.PORT),
+  port: parsePort(getRequiredEnv('PORT')),
   serviceName: SERVICE_NAME,
-  nodeEnv: process.env.NODE_ENV ?? DEFAULT_NODE_ENV,
+  nodeEnv: parseNodeEnvironment(getRequiredEnv('NODE_ENV')),
 } as const;
