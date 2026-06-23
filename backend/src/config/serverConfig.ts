@@ -1,19 +1,8 @@
+import { getRequiredEnv } from './env.js';
+
 const SERVICE_NAME = 'officeguard-lab-backend';
 
 type NodeEnvironment = 'development' | 'test' | 'production';
-
-/**
- * 필수 환경 변수 값 조회
- */
-const getRequiredEnv = (name: string): string => {
-  const value = process.env[name];
-
-  if (value === undefined || value.trim() === '') {
-    throw new Error(`[config] ${name} is required`);
-  }
-
-  return value.trim();
-};
 
 /**
  * PORT 환경 변수를 서버에서 사용할 포트 번호로 변환
