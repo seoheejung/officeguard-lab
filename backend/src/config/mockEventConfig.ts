@@ -1,15 +1,4 @@
-/**
- * 필수 환경 변수 조회
- */
-const getRequiredEnv = (name: string): string => {
-  const value = process.env[name];
-
-  if (value === undefined || value.trim() === '') {
-    throw new Error(`[config] ${name} is required`);
-  }
-
-  return value;
-};
+import { getRequiredEnv } from './env.js';
 
 /**
  * MOCK_EVENT_INTERVAL_MS 환경 변수 이벤트 생성 주기로 변환

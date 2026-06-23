@@ -19,6 +19,13 @@ interface MockEventStep {
 }
 
 /**
+ * 생성된 SecurityEvent 전달 함수
+ */
+type SecurityEventPublisher = (
+  event: SecurityEvent,
+) => Promise<void>;
+
+/**
  * 모든 Mock 이벤트에서 사용하는 고유 ID와 발생 시각 생성
  */
 const createEventIdentity = (): {
@@ -119,14 +126,16 @@ const mockEventSteps: readonly MockEventStep[] = [
       ),
   },
 ];
-
 /**
- * 정의된 Mock 이벤트를 지정된 주기로 한 건씩 순차 생성
+ * 정의된 Mock 이벤트를 지정된 주기로 한 건씩 순차 생성 및 전달
  */
-export const startMockEventGenerator = (intervalMs: number): void => {
+export const startMockEventGenerator = (
+  intervalMs: number,
+  publishEvent: SecurityEventPublisher,
+): void => {
   let currentStepIndex = 0;
 
-  const generateNextEvent = (): void => {
+  const generateNextEvent = async (): Promise<void> => {
     const currentStep = mockEventSteps[currentStepIndex];
 
     if (currentStep === undefined) {
@@ -142,13 +151,27 @@ export const startMockEventGenerator = (intervalMs: number): void => {
       event,
     );
 
-    currentStepIndex = (currentStepIndex + 1) % mockEventSteps.length;
+    await publishEvent(event);
+
+    currentStepIndex =
+      (currentStepIndex + 1) % mockEventSteps.length;
   };
 
-  console.log(`[mock-event] generator started. interval=${intervalMs}ms`);
+  const runNextEvent = (): void => {
+    void generateNextEvent().catch((error) => {
+      console.error(
+        '[mock-event] failed to publish event:',
+        error,
+      );
+    });
+  };
 
-  // 서버 시작 직후 첫 번째 이벤트를 생성
-  generateNextEvent();
+  console.log(
+    `[mock-event] generator started. interval=${intervalMs}ms`,
+  );
 
-  setInterval(generateNextEvent, intervalMs);
+  // 서버 시작 직후 첫 번째 이벤트 생성 및 발행
+  runNextEvent();
+
+  setInterval(runNextEvent, intervalMs);
 };

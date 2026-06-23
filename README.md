@@ -74,6 +74,37 @@ flowchart TD
 
 ---
 
+## Kafka PipeLine
+
+```
+Mock Event Generator
+        │
+        ▼
+Kafka Producer
+        │
+        ▼
+officeguard.security.events
+        │
+        ▼
+Kafka Consumer
+        │
+        ▼
+Console Log
+```
+
+### 애플리케이션 실행 순서
+```
+환경 변수 검증
+→ Kafka Topic 생성 또는 존재 확인
+→ Kafka Producer 연결
+→ Kafka Consumer 연결
+→ Consumer Topic 구독
+→ Express 서버 실행
+→ Mock Event Generator 실행
+```
+
+---
+
 ## 주요 기능
 
 ### DNS 관측
@@ -127,7 +158,11 @@ DNS_QUERY
 
 ---
 
-## 이벤트 예시
+## 이벤트 모델
+
+모든 이벤트는 공통 필드와 이벤트별 `metadata`를 가진다.
+
+### 이벤트 예시
 
 ```json
 {
@@ -160,6 +195,23 @@ DNS_QUERY
 }
 ```
 
+### 이벤트 타입
+
+```text
+DNS_QUERY
+NETWORK_FLOW
+PROCESS_START
+FILE_CREATED
+FILE_MODIFIED
+FILE_DELETED
+FILE_COPIED
+USB_CONNECTED
+USB_DISCONNECTED
+PRINT_REQUESTED
+EMAIL_ATTACHMENT_SENT
+RULE_HIT
+```
+
 ---
 
 ## 기술 스택
@@ -173,8 +225,9 @@ DNS_QUERY
 
 ### Event Pipeline
 
-* Kafka
-* Redis Stream
+* Apache Kafka
+* KafkaJS
+* KRaft
 
 ### Storage
 
@@ -200,11 +253,16 @@ DNS_QUERY
 
 로컬 실행과 Docker Compose 실행에 `infra/.env` 파일을 사용한다.
 
-| 환경 변수                    | 역할             |
-| ------------------------ | -------------- |
-| `NODE_ENV`               | 애플리케이션 실행 환경   |
-| `PORT`                   | Express 서버 포트  |
-| `MOCK_EVENT_INTERVAL_MS` | Mock 이벤트 생성 주기 |
+| 환경 변수                         | 역할                       |
+| ----------------------------- | ------------------------ |
+| `NODE_ENV`                    | 애플리케이션 실행 환경             |
+| `PORT`                        | Express 서버 포트            |
+| `MOCK_EVENT_INTERVAL_MS`      | Mock 이벤트 생성 주기           |
+| `KAFKA_CLIENT_ID`             | Kafka Client 식별자         |
+| `KAFKA_BROKERS`               | 로컬 Backend용 Kafka 주소     |
+| `KAFKA_DOCKER_BROKERS`        | Docker Backend용 Kafka 주소 |
+| `KAFKA_SECURITY_EVENTS_TOPIC` | SecurityEvent Topic      |
+| `KAFKA_CONSUMER_GROUP_ID`     | Consumer Group 식별자       |
 
 환경 변수는 모두 필수이며 코드 내부 기본값을 사용하지 않는다.
 
@@ -293,12 +351,14 @@ docker compose --env-file .\infra\.env -f .\infra\docker-compose.yml down
 * 이벤트 순차 반복 및 콘솔 출력
 * `RULE_HIT` 생성 제외
 
-### Phase 4. Event Pipeline
+### Phase 4. Event Pipeline ✅
 
-* Kafka 또는 Redis Stream 구성
-* Producer 구현
-* Consumer 구현
-* 이벤트 publish/consume 검증
+* Kafka 단일 KRaft 브로커 구성
+* Kafka Producer / Consumer 구현
+* SecurityEvent Topic 생성 및 확인
+* Mock 이벤트 발행 및 수신
+* Producer와 Consumer `eventId` 일치 확인
+* 로컬 및 빌드 결과 실행 검증
 
 ### Phase 5. Rule-based Analyzer
 
@@ -341,14 +401,13 @@ docker compose --env-file .\infra\.env -f .\infra\docker-compose.yml down
 
 이 프로젝트는 보안 관측 구조를 학습하기 위한 실험 프로젝트다.
 
-* 허가된 홈랩 환경에서만 사용한다.
-* 실제 회사망이나 타인 네트워크를 대상으로 사용하지 않는다.
-* 패킷 payload를 저장하지 않는다.
-* 개인 계정 정보, 쿠키, 토큰을 수집하지 않는다.
-* 개인 파일 본문을 수집하지 않는다.
-* 사용자 실명 기반 감시 기능을 만들지 않는다.
-* 내부 IP 익명화 옵션을 제공한다.
-* 이벤트 보관 기간을 설정할 수 있도록 한다.
+* 허가된 홈랩 환경에서만 사용
+* 타인 네트워크 및 실제 회사망 대상 사용 금지
+* 패킷 payload 및 파일 본문 저장 금지
+* 계정 정보, 쿠키, 토큰 수집 금지
+* 사용자 실명 대신 익명화된 별칭 사용
+* 실제 USB 시리얼 번호 저장 금지
+* 로컬 환경 변수와 런타임 데이터 Git 제외
 
 ---
 
@@ -360,6 +419,7 @@ officeguard-lab/
  │   ├─ src/
  │   │   ├─ config/
  │   │   ├─ events/
+ │   │   ├─ mock/
  │   │   └─ index.ts
  │   ├─ .dockerignore
  │   ├─ Dockerfile

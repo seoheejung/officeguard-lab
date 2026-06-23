@@ -15,7 +15,8 @@
   },
   "packageManager": "pnpm@10.34.3",
   "dependencies": {
-    "express": "^5.2.1"
+    "express": "^5.2.1",
+    "kafkajs": "2.2.4"
   },
   "devDependencies": {
     "@types/express": "^5.0.6",
