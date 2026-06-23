@@ -4,6 +4,13 @@ import { kafkaConfig } from '../config/kafkaConfig.js';
 import type { SecurityEvent } from '../events/index.js';
 
 /**
+ * Kafka Consumer가 수신한 SecurityEvent 처리 함수
+ */
+export type SecurityEventHandler = (
+  event: SecurityEvent,
+) => Promise<void>;
+
+/**
  * Kafka Client 생성
  */
 const kafka = new Kafka({
@@ -64,9 +71,11 @@ const ensureSecurityEventsTopic = async (): Promise<void> => {
 };
 
 /**
- * Kafka Consumer 메시지 처리
+ * Kafka Consumer 연결과 메시지 처리 시작
  */
-const startSecurityEventConsumer = async (): Promise<void> => {
+const startSecurityEventConsumer = async (
+  handleSecurityEvent: SecurityEventHandler,
+): Promise<void> => {
   await consumer.connect();
 
   console.log(
@@ -95,21 +104,26 @@ const startSecurityEventConsumer = async (): Promise<void> => {
         return;
       }
 
+      let event: SecurityEvent;
+
       try {
-        const event = JSON.parse(
+        event = JSON.parse(
           message.value.toString('utf8'),
         ) as SecurityEvent;
-
-        console.log(
-          `[kafka-consumer] received. topic=${topic} partition=${partition} offset=${message.offset} eventType=${event.eventType} eventId=${event.eventId}`,
-          event,
-        );
       } catch (error) {
         console.error(
           `[kafka-consumer] invalid JSON message. topic=${topic} partition=${partition} offset=${message.offset}`,
           error,
         );
+        return;
       }
+
+      console.log(
+        `[kafka-consumer] received. topic=${topic} partition=${partition} offset=${message.offset} eventType=${event.eventType} eventId=${event.eventId}`,
+        event,
+      );
+
+      await handleSecurityEvent(event);
     },
   });
 };
@@ -117,14 +131,18 @@ const startSecurityEventConsumer = async (): Promise<void> => {
 /**
  * Kafka Topic, Producer, Consumer 초기화
  */
-export const startEventPipeline = async (): Promise<void> => {
+export const startEventPipeline = async (
+  handleSecurityEvent: SecurityEventHandler,
+): Promise<void> => {
   await ensureSecurityEventsTopic();
 
   await producer.connect();
 
   console.log('[kafka-producer] connected');
 
-  await startSecurityEventConsumer();
+  await startSecurityEventConsumer(
+    handleSecurityEvent,
+  );
 };
 
 /**

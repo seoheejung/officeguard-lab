@@ -6,7 +6,7 @@
 
 **OfficeGuard Lab**은 허가된 홈랩 환경에서 네트워크 메타데이터와 단말 이벤트를 수집하고, 이를 실시간으로 분석해 보안 관점의 이상 행위를 탐지하는 프로젝트다.
 
-미니PC를 중심 서버로 사용하며, DNS 요청, 네트워크 flow, endpoint event를 공통 이벤트 모델로 정규화한 뒤 Kafka 또는 Redis Stream 기반 파이프라인을 통해 처리한다. 이후 Rule 기반 분석 결과를 WebSocket으로 대시보드에 전달한다.
+미니PC를 중심 서버로 사용하며, DNS 요청, 네트워크 flow, endpoint event를 공통 이벤트 모델로 정규화한 뒤 Apache Kafka 기반 파이프라인을 통해 처리한다. 이후 Rule 기반 분석 결과를 WebSocket으로 대시보드에 전달한다.
 
 이 프로젝트는 실제 사용자 감시나 패킷 감청을 목표로 하지 않는다.
 
@@ -18,7 +18,7 @@
 * DNS query log 수집 및 정규화
 * endpoint event mock 수집
 * network flow event 모델 설계
-* Kafka 또는 Redis Stream 기반 이벤트 처리
+* Apache Kafka 기반 이벤트 처리
 * Rule 기반 이상 행위 탐지
 * WebSocket 기반 실시간 대시보드 구현
 * privacy-aware logging 구조 설계
@@ -70,37 +70,68 @@ flowchart TD
     Analyzer --> WebSocket["WebSocket Server"]
 
     WebSocket --> Dashboard["Realtime Dashboard"]
+    Storage --> Report["Event Report"]
 ```
 
 ---
 
-## Kafka PipeLine
+## Kafka Pipeline
 
-```
+```text
 Mock Event Generator
         │
         ▼
 Kafka Producer
         │
         ▼
-officeguard.security.events
+SecurityEvent Topic
         │
         ▼
 Kafka Consumer
         │
         ▼
-Console Log
+Rule-based Analyzer
+        │
+        ▼
+Rule 조건 평가
+        │
+        ├─ 조건 불충족
+        │      └─ 처리 종료
+        │
+        └─ 조건 충족
+               │
+               ▼
+          RULE_HIT 생성
+               │
+               ▼
+          Kafka Producer
+               │
+               ▼
+      SecurityEvent Topic 재발행
 ```
 
 ### 애플리케이션 실행 순서
-```
+
+```text
 환경 변수 검증
-→ Kafka Topic 생성 또는 존재 확인
-→ Kafka Producer 연결
-→ Kafka Consumer 연결
-→ Consumer Topic 구독
+→ RuleBasedAnalyzer 인스턴스 생성
+→ Kafka Topic 확인
+→ Producer 연결
+→ Consumer 연결
+→ Consumer Handler 등록
 → Express 서버 실행
 → Mock Event Generator 실행
+```
+
+### 이벤트 처리 순서
+```text
+SecurityEvent 수신
+→ Analyzer Rule 평가
+→ RuleHitEvent 배열 반환
+→ Rule Hit 로그 출력
+→ 기존 Kafka Topic 재발행
+→ Consumer가 RULE_HIT 수신
+→ Analyzer가 RULE_HIT 제외
 ```
 
 ---
@@ -139,13 +170,18 @@ DNS_QUERY
 → 반복
 ```
 
-### Rule-based Detection
+### Rule-based Analyzer
 
+수집된 `SecurityEvent`를 사전에 정의한 조건으로 분석해 이상 행위 가능성을 탐지한다.
+
+단일 이벤트, 연속 이벤트, 시간 범위 집계 조건을 평가하며, 조건을 만족하면 원본 이벤트와 별도의 `RULE_HIT` 이벤트를 생성해 Kafka Topic에 다시 발행한다.
+
+`RULE_HIT`은 보안 사고 확정이 아니라 탐지 조건에 해당하는 이벤트가 관측되었음을 의미한다.
+
+* 대용량 파일 복사 탐지
 * USB 연결 후 파일 복사 탐지
-* 파일 복사 후 외부 도메인 접속 탐지
+* 파일 복사 후 외부 전송 대상 도메인 DNS 조회 탐지
 * DNS 요청량 급증 탐지
-* 짧은 시간 내 다수 외부 도메인 접속 탐지
-* 대량 outbound traffic 탐지
 
 ### Realtime Dashboard
 
@@ -183,14 +219,21 @@ DNS_QUERY
 
 ```json
 {
-  "eventId": "evt_002",
+  "eventId": "rule-hit-event-id",
   "eventType": "RULE_HIT",
-  "timestamp": "2026-06-19T12:40:00.000+09:00",
+  "timestamp": "2026-06-24T00:00:00.000Z",
   "sourceIp": "192.168.0.12",
+  "deviceId": "test-laptop-01",
+  "userAlias": "user-001",
   "severity": "HIGH",
-  "message": "USB 연결 후 파일 복사와 외부 도메인 접속이 연속 발생했습니다.",
+  "message": "USB 연결 후 설정된 시간 범위 안에 파일 복사가 발생했습니다.",
   "metadata": {
-    "ruleId": "USB_FILE_EXFILTRATION_SUSPECTED"
+    "ruleId": "USB_FILE_COPY_DETECTED",
+    "relatedEventIds": [
+      "usb-connected-event-id",
+      "file-copied-event-id"
+    ],
+    "windowSeconds": 30
   }
 }
 ```
@@ -263,6 +306,12 @@ RULE_HIT
 | `KAFKA_DOCKER_BROKERS`        | Docker Backend용 Kafka 주소 |
 | `KAFKA_SECURITY_EVENTS_TOPIC` | SecurityEvent Topic      |
 | `KAFKA_CONSUMER_GROUP_ID`     | Consumer Group 식별자       |
+| `ANALYZER_LARGE_FILE_COPY_BYTES_THRESHOLD` | 대용량 파일 복사 탐지 기준 byte 수 |
+| `ANALYZER_USB_FILE_COPY_WINDOW_SECONDS` | USB 연결 후 파일 복사 탐지 시간 |
+| `ANALYZER_FILE_COPY_EXTERNAL_DOMAIN_WINDOW_SECONDS` | 파일 복사 후 외부 도메인 조회 탐지 시간 |
+| `ANALYZER_DNS_SPIKE_WINDOW_SECONDS` | DNS 요청량 집계 시간 |
+| `ANALYZER_DNS_SPIKE_THRESHOLD` | DNS 요청량 급증 탐지 기준 |
+| `ANALYZER_EXTERNAL_DOMAINS` | 외부 전송 대상 도메인 목록 |
 
 환경 변수는 모두 필수이며 코드 내부 기본값을 사용하지 않는다.
 
@@ -315,6 +364,11 @@ docker compose --env-file .\infra\.env -f .\infra\docker-compose.yml ps
 Invoke-RestMethod http://localhost:4000/health
 ```
 
+#### Backend 로그 확인:
+```powershell
+docker compose --env-file .\infra\.env  -f .\infra\docker-compose.yml logs -f backend
+```
+
 #### 종료
 
 ```powershell
@@ -329,71 +383,102 @@ docker compose --env-file .\infra\.env -f .\infra\docker-compose.yml down
 
 * Node.js + TypeScript 프로젝트 구성
 * pnpm 기반 패키지 관리
+* Express 서버 구성
+* 환경 변수 분리
 * Docker Compose 구성
-* 기본 서버 및 health check API 구현
+* Health Check API 구현
 
 ### Phase 2. 이벤트 모델 정의 ✅ 완료
 
-* 공통 SecurityEvent 타입 정의
-* DNS event 정의
-* Network flow event 정의
-* Endpoint event 정의
-* Rule hit event 정의
+* 공통 `SecurityEvent` 타입 정의
+* `DNS_QUERY` 이벤트 정의
+* `NETWORK_FLOW` 이벤트 정의
+* `USB_CONNECTED` 이벤트 정의
+* `FILE_COPIED` 이벤트 정의
+* `RULE_HIT` 이벤트 정의
+* 이벤트별 metadata 타입 분리
 
 ### Phase 3. Mock Event Generator ✅ 완료
 
 * 정상 DNS Query Mock 이벤트 생성
 * USB 연결 Mock 이벤트 생성
 * 파일 복사 Mock 이벤트 생성
-* 외부 전송 의심 도메인 DNS Query 생성
+* 외부 전송 대상 도메인 DNS Query 생성
 * UUID 및 ISO 8601 timestamp 생성
 * 환경 변수 기반 생성 주기 설정
-* 이벤트 순차 반복 및 콘솔 출력
-* `RULE_HIT` 생성 제외
+* Mock 이벤트 순차 반복
+* 정상 및 의심 이벤트 콘솔 출력
+* Mock Generator의 `RULE_HIT` 직접 생성 제외
 
-### Phase 4. Event Pipeline ✅
+### Phase 4. Event Pipeline ✅ 완료
 
 * Kafka 단일 KRaft 브로커 구성
-* Kafka Producer / Consumer 구현
-* SecurityEvent Topic 생성 및 확인
-* Mock 이벤트 발행 및 수신
-* Producer와 Consumer `eventId` 일치 확인
-* 로컬 및 빌드 결과 실행 검증
+* SecurityEvent Topic 구성
+* Kafka Producer 구현
+* Kafka Consumer 구현
+* Topic 생성 또는 존재 여부 확인
+* Mock 이벤트 Kafka 발행
+* Consumer 이벤트 수신 및 로그 출력
+* Producer와 Consumer의 `eventId` 일치 확인
+* 로컬 및 Docker Compose 실행 검증
 
-### Phase 5. Rule-based Analyzer
+### Phase 5. Rule-based Analyzer ✅ 완료
 
-* 단일 이벤트 기반 탐지
-* 연속 이벤트 기반 탐지
-* Rule hit event 생성
+* Analyzer 환경 설정 분리
+* 탐지 Rule과 Severity 정의
+* 대용량 파일 복사 탐지
+* USB 연결 후 파일 복사 탐지
+* 파일 복사 후 외부 전송 대상 도메인 DNS 조회 탐지
+* 동일한 `sourceIp`의 DNS 요청량 급증 탐지
+* 이벤트 발생 시각 기반 시간 범위 분석
+* 동일한 `deviceId` 또는 `sourceIp` 기준 이벤트 연결
+* Analyzer 상태 메모리 저장 및 만료 처리
+* `RULE_HIT` 이벤트 생성
+* 탐지 근거 이벤트 ID 기록
+* 기존 SecurityEvent Topic 재발행
+* `RULE_HIT` 재분석 방지
+* DNS Spike 반복 탐지 제한
 
 ### Phase 6. Storage
 
-* 이벤트 저장
+* 이벤트 저장 구조 설계
+* `SecurityEvent` 저장
+* `RULE_HIT` 저장
 * 최근 이벤트 조회
-* Rule hit 조회
-* IP 또는 deviceId 기준 필터링
+* 시간 범위 조회
+* `sourceIp` 또는 `deviceId` 기준 필터링
 
 ### Phase 7. Realtime Dashboard
 
-* WebSocket 실시간 이벤트 전달
+* WebSocket 서버 구성
+* SecurityEvent 실시간 전달
+* Rule Hit 실시간 전달
 * 이벤트 타임라인 표시
 * DNS 요청 현황 표시
-* Rule hit 목록 표시
+* Rule Hit 목록 표시
+* WebSocket 연결 상태 표시
 
 ### Phase 8. Mini PC DNS 연동
 
 * 미니PC DNS 관측 도구 구성
-* DNS query log 수집
-* 실제 DNS event 변환
-* 대시보드 표시
+* DNS Query Log 수집 방식 확인
+* DNS Event Collector 구현
+* 실제 DNS 로그를 `DNS_QUERY` 이벤트로 변환
+* Event Pipeline 발행
+* Dashboard 표시
 
 ### Phase 9. 문서화 / 시연
 
 * README 정리
-* 아키텍처 문서화
+* 시스템 구조 문서화
+* 이벤트 처리 흐름 문서화
 * 이벤트 모델 문서화
-* privacy boundary 명시
+* Rule-based Analyzer 문서화
+* 보안 및 Privacy Boundary 명시
+* 실행 방법 정리
 * 시연 시나리오 작성
+* 실행 화면 및 로그 추가
+
 
 ---
 
@@ -411,7 +496,7 @@ docker compose --env-file .\infra\.env -f .\infra\docker-compose.yml down
 
 ---
 
-## 디렉터리 구조
+## 디렉토리 구조
 
 ```text
 officeguard-lab/
@@ -420,6 +505,8 @@ officeguard-lab/
  │   │   ├─ config/
  │   │   ├─ events/
  │   │   ├─ mock/
+ │   │   ├─ torage/
+ │   │   ├─ websocket/
  │   │   └─ index.ts
  │   ├─ .dockerignore
  │   ├─ Dockerfile
