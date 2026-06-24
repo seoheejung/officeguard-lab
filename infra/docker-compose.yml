@@ -1,12 +1,15 @@
 services:
+  # SecurityEvent 전달용 Kafka
   kafka:
     image: apache/kafka:4.1.2
 
     container_name: officeguard-lab-kafka
 
+    # Host와 Kafka 외부 Listener 연결
     ports:
       - "9092:9092"
 
+    # 단일 KRaft Broker 구성
     environment:
       KAFKA_NODE_ID: 1
       KAFKA_PROCESS_ROLES: broker,controller
@@ -26,6 +29,7 @@ services:
 
     restart: unless-stopped
 
+    # Kafka Topic 조회 가능 상태 확인
     healthcheck:
       test:
         [
@@ -37,6 +41,42 @@ services:
       retries: 10
       start_period: 10s
 
+  # SecurityEvent 저장용 PostgreSQL
+  postgres:
+    image: postgres:17-alpine
+
+    container_name: officeguard-lab-postgres
+
+    # PostgreSQL 초기 Database와 관리자 계정 설정
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB is required}
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER is required}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+
+    # Host 공개 포트와 PostgreSQL 내부 포트 연결
+    ports:
+      - "${POSTGRES_PORT:?POSTGRES_PORT is required}:5432"
+
+    # Database 데이터 영속화와 초기화 SQL 연결
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
+
+    restart: unless-stopped
+
+    # PostgreSQL 연결 준비 상태 확인
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -h 127.0.0.1 -p 5432 -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  # OfficeGuard Lab Backend
   backend:
     build:
       context: ../backend
@@ -44,32 +84,47 @@ services:
 
     container_name: officeguard-lab-backend
 
+    # Backend 실행 환경 변수
     environment:
       NODE_ENV: ${NODE_ENV:?NODE_ENV is required}
       PORT: ${PORT:?PORT is required}
       MOCK_EVENT_INTERVAL_MS: ${MOCK_EVENT_INTERVAL_MS:?MOCK_EVENT_INTERVAL_MS is required}
 
+      # Docker Network 내부 Kafka 연결 정보
       KAFKA_CLIENT_ID: ${KAFKA_CLIENT_ID:?KAFKA_CLIENT_ID is required}
       KAFKA_BROKERS: ${KAFKA_DOCKER_BROKERS:?KAFKA_DOCKER_BROKERS is required}
       KAFKA_SECURITY_EVENTS_TOPIC: ${KAFKA_SECURITY_EVENTS_TOPIC:?KAFKA_SECURITY_EVENTS_TOPIC is required}
       KAFKA_CONSUMER_GROUP_ID: ${KAFKA_CONSUMER_GROUP_ID:?KAFKA_CONSUMER_GROUP_ID is required}
 
+      # Rule-based Analyzer 설정
       ANALYZER_LARGE_FILE_COPY_BYTES_THRESHOLD: ${ANALYZER_LARGE_FILE_COPY_BYTES_THRESHOLD:?ANALYZER_LARGE_FILE_COPY_BYTES_THRESHOLD is required}
       ANALYZER_USB_FILE_COPY_WINDOW_SECONDS: ${ANALYZER_USB_FILE_COPY_WINDOW_SECONDS:?ANALYZER_USB_FILE_COPY_WINDOW_SECONDS is required}
       ANALYZER_FILE_COPY_EXTERNAL_DOMAIN_WINDOW_SECONDS: ${ANALYZER_FILE_COPY_EXTERNAL_DOMAIN_WINDOW_SECONDS:?ANALYZER_FILE_COPY_EXTERNAL_DOMAIN_WINDOW_SECONDS is required}
       ANALYZER_DNS_SPIKE_WINDOW_SECONDS: ${ANALYZER_DNS_SPIKE_WINDOW_SECONDS:?ANALYZER_DNS_SPIKE_WINDOW_SECONDS is required}
       ANALYZER_DNS_SPIKE_THRESHOLD: ${ANALYZER_DNS_SPIKE_THRESHOLD:?ANALYZER_DNS_SPIKE_THRESHOLD is required}
       ANALYZER_EXTERNAL_DOMAINS: ${ANALYZER_EXTERNAL_DOMAINS:?ANALYZER_EXTERNAL_DOMAINS is required}
-      
+
+      # Docker Network 내부 PostgreSQL 연결 정보
+      POSTGRES_HOST: ${POSTGRES_DOCKER_HOST:?POSTGRES_DOCKER_HOST is required}
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB is required}
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER is required}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+
+    # Express 서버 포트 연결
     ports:
       - "${PORT:?PORT is required}:${PORT:?PORT is required}"
 
+    # Kafka와 PostgreSQL 준비 완료 후 Backend 시작
     depends_on:
       kafka:
+        condition: service_healthy
+      postgres:
         condition: service_healthy
 
     restart: unless-stopped
 
+    # Backend Health Check API 확인
     healthcheck:
       test:
         [
@@ -82,3 +137,7 @@ services:
       timeout: 3s
       retries: 5
       start_period: 5s
+
+# PostgreSQL 데이터 영속화
+volumes:
+  postgres-data:
