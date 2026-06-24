@@ -6,7 +6,7 @@
 
 **OfficeGuard Lab**은 허가된 홈랩 환경에서 네트워크 메타데이터와 단말 이벤트를 수집하고, 이를 실시간으로 분석해 보안 관점의 이상 행위를 탐지하는 프로젝트다.
 
-미니PC를 중심 서버로 사용하며, DNS 요청, 네트워크 flow, endpoint event를 공통 이벤트 모델로 정규화한 뒤 Apache Kafka 기반 파이프라인을 통해 처리한다. 이후 Rule 기반 분석 결과를 WebSocket으로 대시보드에 전달한다.
+미니PC를 중심 서버로 사용하며, DNS 요청, 네트워크 flow, endpoint event를 공통 이벤트 모델로 정규화한 뒤 Apache Kafka 기반 파이프라인을 통해 처리한다. 수신한 이벤트와 Rule 기반 분석 결과를 PostgreSQL에 저장하고, 이후 WebSocket을 통해 대시보드에 전달한다.
 
 이 프로젝트는 실제 사용자 감시나 패킷 감청을 목표로 하지 않는다.
 
@@ -22,6 +22,8 @@
 * Rule 기반 이상 행위 탐지
 * WebSocket 기반 실시간 대시보드 구현
 * privacy-aware logging 구조 설계
+* PostgreSQL 기반 SecurityEvent 저장
+* 최근 이벤트 및 Rule Hit 조회 API 구현
 
 ---
 
@@ -90,6 +92,9 @@ SecurityEvent Topic
 Kafka Consumer
         │
         ▼
+PostgreSQL 저장
+        │
+        ▼
 Rule-based Analyzer
         │
         ▼
@@ -108,13 +113,21 @@ Rule 조건 평가
                │
                ▼
       SecurityEvent Topic 재발행
+               │
+               ▼
+        Consumer 재수신
+               │
+               ▼
+       RULE_HIT PostgreSQL 저장
 ```
+
 
 ### 애플리케이션 실행 순서
 
 ```text
 환경 변수 검증
 → RuleBasedAnalyzer 인스턴스 생성
+→ PostgreSQL 연결 확인
 → Kafka Topic 확인
 → Producer 연결
 → Consumer 연결
@@ -124,14 +137,17 @@ Rule 조건 평가
 ```
 
 ### 이벤트 처리 순서
+
 ```text
 SecurityEvent 수신
-→ Analyzer Rule 평가
-→ RuleHitEvent 배열 반환
-→ Rule Hit 로그 출력
+→ PostgreSQL 저장 시도
+→ 신규 저장 또는 중복 저장 생략
+→ Rule 기반 분석
+→ RULE_HIT 생성
 → 기존 Kafka Topic 재발행
-→ Consumer가 RULE_HIT 수신
-→ Analyzer가 RULE_HIT 제외
+→ Consumer 재수신
+→ RULE_HIT PostgreSQL 저장
+→ Analyzer의 RULE_HIT 분석 제외
 ```
 
 ---
@@ -182,6 +198,27 @@ DNS_QUERY
 * USB 연결 후 파일 복사 탐지
 * 파일 복사 후 외부 전송 대상 도메인 DNS 조회 탐지
 * DNS 요청량 급증 탐지
+
+### Event Storage
+
+Kafka Consumer가 수신한 `SecurityEvent`를 PostgreSQL에 저장한다.
+
+원본 이벤트와 `RULE_HIT`은 동일한 `security_events` 테이블에 저장하며, 이벤트별 `metadata`는 JSONB 형식으로 보관한다.
+
+* `SecurityEvent` 및 `RULE_HIT` 저장
+* `eventId` 기준 중복 Row 저장 방지
+* 최근 이벤트 조회
+* 이벤트 단건 조회
+* 시간 범위 조회
+* 이벤트 타입 기준 필터링
+* `sourceIp` 또는 `deviceId` 기준 필터링
+* Severity 및 Rule ID 기준 Rule Hit 조회
+
+```text
+GET /api/events
+GET /api/events/:eventId
+GET /api/rule-hits
+```
 
 ### Realtime Dashboard
 
@@ -257,6 +294,51 @@ RULE_HIT
 
 ---
 
+#### 테이블 구조
+
+모든 원본 이벤트와 `RULE_HIT`은 하나의 `security_events` 테이블에 저장한다.
+
+조회와 필터링에 사용하는 공통 필드는 개별 Column으로 분리하고, 이벤트 타입마다 구조가 다른 세부 정보는 `metadata` JSONB Column에 저장한다.
+
+| Column        | 타입           | 역할  |
+| ------------- | ------------- | ------ |
+| `event_id`    | `TEXT`        | 이벤트 고유 ID 및 Primary Key |
+| `event_type`  | `TEXT`        | `DNS_QUERY`, `FILE_COPIED`, `RULE_HIT` 등의 이벤트 타입 |
+| `occurred_at` | `TIMESTAMPTZ` | 원본 이벤트 발생 시각|
+| `source_ip`   | `TEXT`        | 이벤트가 발생한 내부 IP  |
+| `device_id`   | `TEXT`        | 테스트 단말 식별자 |
+| `user_alias`  | `TEXT`        | 익명화된 사용자 별칭 |
+| `severity`    | `TEXT`        | Rule Hit 위험도 |
+| `message`     | `TEXT`        | 이벤트 설명 |
+| `metadata`    | `JSONB`       | 이벤트 타입별 세부 데이터 |
+| `stored_at`   | `TIMESTAMPTZ` | PostgreSQL 저장 시각  |
+
+```text
+event_id
+→ 동일 eventId의 중복 Row 저장 방지
+
+occurred_at
+→ 이벤트 발생 시각 기준 조회
+
+stored_at
+→ 실제 Database 저장 시각 확인
+
+metadata
+→ DNS, Endpoint, Rule Hit별 세부 데이터 저장
+```
+
+주요 조회 대상에는 Index를 적용한다.
+
+```text
+occurred_at
+event_type + occurred_at
+source_ip + occurred_at
+device_id + occurred_at
+metadata.ruleId + occurred_at
+```
+
+---
+
 ## 기술 스택
 
 ### Backend
@@ -275,7 +357,8 @@ RULE_HIT
 ### Storage
 
 * PostgreSQL
-* SQLite
+* JSONB
+* node-postgres (`pg`)
 
 ### Infra
 
@@ -312,11 +395,16 @@ RULE_HIT
 | `ANALYZER_DNS_SPIKE_WINDOW_SECONDS` | DNS 요청량 집계 시간 |
 | `ANALYZER_DNS_SPIKE_THRESHOLD` | DNS 요청량 급증 탐지 기준 |
 | `ANALYZER_EXTERNAL_DOMAINS` | 외부 전송 대상 도메인 목록 |
+| `POSTGRES_HOST` | 로컬 Backend용 PostgreSQL Host |
+| `POSTGRES_DOCKER_HOST` | Docker Backend용 PostgreSQL Host |
+| `POSTGRES_PORT` | PostgreSQL 포트 |
+| `POSTGRES_DB` | PostgreSQL Database 이름 |
+| `POSTGRES_USER` | PostgreSQL 사용자 |
+| `POSTGRES_PASSWORD` | PostgreSQL 비밀번호 |
 
 환경 변수는 모두 필수이며 코드 내부 기본값을 사용하지 않는다.
 
 실제 환경 변수 값은 README에 작성하지 않고 `infra/.env.example`에서 변수 항목만 관리한다.
-
 
 ---
 
@@ -325,6 +413,8 @@ RULE_HIT
 ### 로컬 실행
 
 ```powershell
+docker compose --env-file .\infra\.env -f .\infra\docker-compose.yml up -d kafka postgres
+
 cd backend
 
 pnpm install
@@ -335,7 +425,15 @@ pnpm dev
 #### Health Check
 
 ```powershell
-Invoke-RestMethod http://localhost:4000/health
+Invoke-RestMethod "http://localhost:4000/health"
+
+Invoke-RestMethod "http://localhost:4000/api/events?limit=10"
+
+Invoke-RestMethod "http://localhost:4000/api/rule-hits?limit=10"
+
+Invoke-RestMethod "http://localhost:4000/api/events?sourceIp=192.168.0.12"
+
+Invoke-RestMethod "http://localhost:4000/api/events?deviceId=test-laptop-01"
 ```
 
 ### 빌드 실행
@@ -439,7 +537,7 @@ docker compose --env-file .\infra\.env -f .\infra\docker-compose.yml down
 * `RULE_HIT` 재분석 방지
 * DNS Spike 반복 탐지 제한
 
-### Phase 6. Storage
+### Phase 6. Storage ✅ 완료
 
 * 이벤트 저장 구조 설계
 * `SecurityEvent` 저장
@@ -479,7 +577,6 @@ docker compose --env-file .\infra\.env -f .\infra\docker-compose.yml down
 * 시연 시나리오 작성
 * 실행 화면 및 로그 추가
 
-
 ---
 
 ## 보안 및 프라이버시 원칙
@@ -502,10 +599,13 @@ docker compose --env-file .\infra\.env -f .\infra\docker-compose.yml down
 officeguard-lab/
  ├─ backend/
  │   ├─ src/
+ │   │   ├─ analyzer/
  │   │   ├─ config/
  │   │   ├─ events/
  │   │   ├─ mock/
- │   │   ├─ torage/
+ │   │   ├─ pipeline/
+ │   │   ├─ routes/
+ │   │   ├─ storage/
  │   │   ├─ websocket/
  │   │   └─ index.ts
  │   ├─ .dockerignore
@@ -521,6 +621,8 @@ officeguard-lab/
  │   └─ mock/
  │
  ├─ infra/
+ │   ├─ postgres/
+ │   │   └─ init/
  │   ├─ .env.example
  │   └─ docker-compose.yml
  │
