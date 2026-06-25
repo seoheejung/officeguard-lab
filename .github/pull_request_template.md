@@ -25,9 +25,9 @@
 * [ ] Phase 5. Rule-based Analyzer
 * [ ] Phase 6. Storage
 * [ ] Phase 7. WebSocket & Realtime Dashboard
-* [ ] Phase 8. Main PC DNS Server와 Mini PC 연동
-* [ ] Phase 9. Mini PC Network Flow 관측
-* [ ] Phase 10. Mini PC Endpoint Event Agent 구현
+* [ ] Phase 8. Mini PC Agent 기본 구성 및 DNS Event 연동
+* [ ] Phase 9. Mini PC Agent Network Flow 수집
+* [ ] Phase 10. Mini PC Agent Endpoint Event 수집
 * [ ] Phase 11. Privacy & Data Protection
 * [ ] Phase 12. 문서화 / 시연
 
@@ -54,26 +54,31 @@
 * [ ] `RULE_HIT` 이벤트 정의
 * [ ] 이벤트별 metadata 타입 정의
 
-### Collector
+### Mini PC Agent
 
-* [ ] DNS Event Collector 구현
-* [ ] Network Flow Collector 구현
-* [ ] 실제 수집 데이터 정규화
-* [ ] `SecurityEvent` 변환
-* [ ] Kafka Topic 발행
-
-### Endpoint Agent
-
-* [ ] Mini PC용 Endpoint Event Agent 구현
-* [ ] Main PC용 Endpoint Event Receiver 구현
+* [ ] Mini PC Agent 프로젝트 구성
+* [ ] Mini PC Agent 단일 실행 파일 생성
+* [ ] 설치 과정 없는 수동 실행 구성
+* [ ] DNS 요청 기록 수집
+* [ ] Network Flow Metadata 수집
 * [ ] 프로세스 실행 감지
 * [ ] 파일 생성, 수정 및 삭제 감지
 * [ ] USB 저장 장치 연결 및 해제 감지
 * [ ] USB 저장 장치 대상 파일 복사 감지
 * [ ] 프린트 요청 이벤트 수집
 * [ ] 테스트 메일 첨부 전송 이벤트 수집
-* [ ] Mini PC에서 Main PC로 이벤트 전송
+* [ ] 실제 수집 데이터 정규화
+* [ ] `SecurityEvent` 변환
+* [ ] 내부망을 통한 Main PC 이벤트 전송
+
+### Event Receiver
+
+* [ ] Main PC Event Receiver 구현
+* [ ] Mini PC Agent 이벤트 수신
 * [ ] 수신 이벤트 구조 검증
+* [ ] 유효하지 않은 이벤트 처리
+* [ ] Kafka Topic 발행
+* [ ] 내부망 통신 확인
 
 ### Pipeline
 
@@ -137,8 +142,9 @@
 * [ ] Kafka 구성
 * [ ] Main PC 보안 관측 서버 환경 구성
 * [ ] Mini PC 검사 대상 환경 구성
-* [ ] Main PC와 Mini PC 네트워크 연결 확인
-* [ ] DNS 관측 도구 연동
+* [ ] Main PC와 Mini PC 내부망 연결 확인
+* [ ] Mini PC Agent 실행 환경 구성
+* [ ] Mini PC Agent 단일 실행 파일 생성
 * [ ] 로컬 실행 절차 문서화
 * [ ] Docker Compose 실행 절차 문서화
 
@@ -160,8 +166,10 @@
 * [ ] Storage API 문서 수정
 * [ ] WebSocket 문서 수정
 * [ ] Dashboard 문서 수정
-* [ ] DNS 및 Network Flow Collector 문서 수정
-* [ ] Endpoint Agent 문서 수정
+* [ ] Mini PC Agent 문서 수정
+* [ ] Main PC Event Receiver 문서 수정
+* [ ] Agent 단일 실행 파일 실행 방법 문서화
+* [ ] 내부망 이벤트 전송 흐름 문서화
 * [ ] Privacy Boundary 문서 수정
 * [ ] 시연 시나리오 수정
 
@@ -180,6 +188,22 @@
 * [ ] `pnpm dev` 실행 확인
 * [ ] Health Check API 응답 확인
 * [ ] 기존 조회 API 응답 확인
+* [ ] Event Receiver 실행 확인
+* [ ] 수신 이벤트 구조 검증 확인
+
+### Mini PC Agent
+
+* [ ] Agent 의존성 설치 완료
+* [ ] Agent typecheck 통과
+* [ ] Agent build 통과
+* [ ] Agent 단일 실행 파일 생성 확인
+* [ ] 설치 과정 없이 Agent 실행 확인
+* [ ] Agent 직접 종료 확인
+* [ ] DNS 요청 수집 확인
+* [ ] Network Flow 수집 확인
+* [ ] Endpoint Event 수집 확인
+* [ ] `SecurityEvent` 변환 확인
+* [ ] 내부망 이벤트 전송 확인
 
 ### Dashboard
 
@@ -205,11 +229,14 @@
 ### Main PC / Mini PC
 
 * [ ] Main PC 서버 실행 확인
-* [ ] Mini PC 연결 확인
+* [ ] Main PC Event Receiver 실행 확인
+* [ ] Mini PC Agent 실행 확인
+* [ ] Main PC와 Mini PC 내부망 연결 확인
 * [ ] Mini PC DNS 요청 수집 확인
 * [ ] Mini PC Network Flow 수집 확인
 * [ ] Mini PC Endpoint Event 수집 확인
 * [ ] Mini PC에서 Main PC로 이벤트 전송 확인
+* [ ] Main PC Event Receiver 이벤트 수신 확인
 
 ### Docker Compose
 
@@ -230,6 +257,13 @@
 
 ## 보안 / 프라이버시 점검
 
+* [ ] 허가된 홈랩 Mini PC에서만 Agent를 실행함
+* [ ] Agent 설치 프로그램을 구성하지 않음
+* [ ] Agent를 Windows Service로 등록하지 않음
+* [ ] Agent 자동 시작을 구성하지 않음
+* [ ] Agent 은닉 실행 또는 프로세스 위장 기능이 없음
+* [ ] Agent 제거 방지 또는 강제 재실행 기능이 없음
+* [ ] Mini PC와 Main PC 사이 내부망으로만 이벤트를 전송함
 * [ ] 패킷 Payload를 저장하지 않음
 * [ ] HTTPS 본문을 수집하지 않음
 * [ ] 계정 비밀번호, Cookie, Token을 수집하지 않음
