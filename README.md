@@ -17,11 +17,11 @@
 * 미니PC 기반 네트워크 관측 서버 구성
 * DNS query log 수집 및 정규화
 * endpoint event mock 수집
-* network flow event 모델 설계
+* network flow metadata 수집 및 정규화
+* privacy-aware logging 설계 및 구현
 * Apache Kafka 기반 이벤트 처리
 * Rule 기반 이상 행위 탐지
 * WebSocket 기반 실시간 대시보드 구현
-* privacy-aware logging 구조 설계
 * PostgreSQL 기반 SecurityEvent 저장
 * 최근 이벤트 및 Rule Hit 조회 API 구현
 
@@ -60,19 +60,22 @@
 flowchart TD
     Client["Test Device / My PC"] --> DNS["Mini PC DNS Server"]
     Client --> Agent["Endpoint Event Agent / Mock Agent"]
+    Client --> FlowCollector["Network Flow Collector"]
 
     DNS --> DNSCollector["DNS Event Collector"]
     Agent --> EndpointCollector["Endpoint Event Collector"]
 
     DNSCollector --> Pipeline["Event Pipeline"]
     EndpointCollector --> Pipeline
+    FlowCollector --> Pipeline
 
     Pipeline --> Analyzer["Rule-based Analyzer"]
     Analyzer --> Storage["Event Storage"]
     Analyzer --> WebSocket["WebSocket Server"]
 
-    WebSocket --> Dashboard["Realtime Dashboard"]
-    Storage --> Report["Event Report"]
+    Storage --> API["Event Query API"]
+    API --> Dashboard["Realtime Dashboard"]
+    WebSocket --> Dashboard
 ```
 
 ---
@@ -121,33 +124,38 @@ Rule 조건 평가
        RULE_HIT PostgreSQL 저장
 ```
 
-
 ### 애플리케이션 실행 순서
 
 ```text
 환경 변수 검증
 → RuleBasedAnalyzer 인스턴스 생성
+→ Express 애플리케이션 및 조회 API 구성
+→ HTTP 서버 생성
+→ HTTP 서버에 WebSocket Endpoint 연결
 → PostgreSQL 연결 확인
 → Kafka Topic 확인
 → Producer 연결
-→ Consumer 연결
-→ Consumer Handler 등록
-→ Express 서버 실행
+→ Consumer 연결 및 Handler 등록
+→ HTTP 및 WebSocket 서버 실행
 → Mock Event Generator 실행
 ```
+
+> WebSocket 서버 객체는 애플리케이션 초기화 과정에서 생성하지만, 실제 Client 연결은 HTTP 서버가 지정된 Port에서 실행된 이후부터 받을 수 있다.
 
 ### 이벤트 처리 순서
 
 ```text
 SecurityEvent 수신
 → PostgreSQL 저장 시도
-→ 신규 저장 또는 중복 저장 생략
+→ 신규 저장 여부 확인
+→ 신규 이벤트 WebSocket 전달
 → Rule 기반 분석
 → RULE_HIT 생성
 → 기존 Kafka Topic 재발행
 → Consumer 재수신
 → RULE_HIT PostgreSQL 저장
-→ Analyzer의 RULE_HIT 분석 제외
+→ 신규 RULE_HIT WebSocket 전달
+→ Analyzer의 RULE_HIT 재분석 제외
 ```
 
 ---
@@ -163,9 +171,10 @@ SecurityEvent 수신
 
 ### Network Flow Event
 
-* source IP / destination IP 기반 흐름 모델링
-* destination port, protocol 기록
-* bytes in/out 기반 트래픽 이벤트 정의
+* source IP / destination IP 기반 Network Flow metadata 수집
+* destination port와 protocol 기록
+* 수집 가능한 경우 bytes in/out 기록
+* 수집 데이터를 `NETWORK_FLOW` 이벤트로 정규화
 
 ### Endpoint Event
 
@@ -225,9 +234,10 @@ GET /api/rule-hits
 * 실시간 이벤트 타임라인
 * DNS 요청 현황
 * 도메인 TOP 10
-* 이벤트 타입별 카운트
 * Rule Hit 목록
-* 위험도별 이벤트 표시
+* 이벤트 타입별 건수
+* Severity별 Rule Hit 표시
+* HIGH / CRITICAL Rule Hit 건수
 
 ---
 
@@ -243,7 +253,6 @@ GET /api/rule-hits
   "eventType": "DNS_QUERY",
   "timestamp": "2026-06-19T12:30:00.000+09:00",
   "sourceIp": "192.168.0.12",
-  "severity": "LOW",
   "message": "DNS query allowed",
   "metadata": {
     "domain": "github.com",
@@ -294,7 +303,7 @@ RULE_HIT
 
 ---
 
-#### 테이블 구조
+### 테이블 구조
 
 모든 원본 이벤트와 `RULE_HIT`은 하나의 `security_events` 테이블에 저장한다.
 
@@ -370,8 +379,11 @@ metadata.ruleId + occurred_at
 ### Dashboard
 
 * React
+* TypeScript
+* Vite
 * Chart.js
 * WebSocket
+* Charm 스타일 터미널 관제 UI
 
 ---
 
@@ -491,10 +503,10 @@ docker compose --env-file .\infra\.env -f .\infra\docker-compose.yml down
 * 공통 `SecurityEvent` 타입 정의
 * `DNS_QUERY` 이벤트 정의
 * `NETWORK_FLOW` 이벤트 정의
-* `USB_CONNECTED` 이벤트 정의
-* `FILE_COPIED` 이벤트 정의
+* Process, File, USB, Print, Email Endpoint 이벤트 정의
 * `RULE_HIT` 이벤트 정의
 * 이벤트별 metadata 타입 분리
+* `SecurityEvent` Union 구성
 
 ### Phase 3. Mock Event Generator ✅ 완료
 
@@ -539,22 +551,24 @@ docker compose --env-file .\infra\.env -f .\infra\docker-compose.yml down
 
 ### Phase 6. Storage ✅ 완료
 
-* 이벤트 저장 구조 설계
-* `SecurityEvent` 저장
-* `RULE_HIT` 저장
-* 최근 이벤트 조회
+* PostgreSQL 기반 `SecurityEvent` 및 `RULE_HIT` 저장
+* `eventId` 기준 중복 저장 방지
+* 최근 이벤트 조회 API 구현
+* 이벤트 단건 조회 API 구현
+* Rule Hit 조회 API 구현
 * 시간 범위 조회
-* `sourceIp` 또는 `deviceId` 기준 필터링
+* `eventType`, `sourceIp`, `deviceId` 기준 필터링
+* `severity`, `ruleId` 기준 Rule Hit 필터링
 
-### Phase 7. Realtime Dashboard
+### Phase 7. WebSocket & Realtime Dashboard
 
 * WebSocket 서버 구성
-* SecurityEvent 실시간 전달
-* Rule Hit 실시간 전달
-* 이벤트 타임라인 표시
-* DNS 요청 현황 표시
-* Rule Hit 목록 표시
-* WebSocket 연결 상태 표시
+* REST API 기반 최근 이벤트 초기 조회
+* SecurityEvent 및 Rule Hit 실시간 전달
+* React + TypeScript + Vite Dashboard 구성
+* 이벤트 타임라인과 DNS 현황 표시
+* Rule Hit과 WebSocket 연결 상태 표시
+* Charm 스타일 터미널 관제 UI 적용
 
 ### Phase 8. Mini PC DNS 연동
 
@@ -563,18 +577,42 @@ docker compose --env-file .\infra\.env -f .\infra\docker-compose.yml down
 * DNS Event Collector 구현
 * 실제 DNS 로그를 `DNS_QUERY` 이벤트로 변환
 * Event Pipeline 발행
+* PostgreSQL 저장
 * Dashboard 표시
 
-### Phase 9. 문서화 / 시연
+### Phase 9. Network Flow Collector
+
+* Network Flow 수집 방식 확인
+* Network Flow Collector 구현
+* 실제 Flow metadata를 `NETWORK_FLOW` 이벤트로 변환
+* Event Pipeline 발행
+* PostgreSQL 저장
+* Dashboard 표시
+
+### Phase 10. Endpoint Mock Event 확장
+
+* Process, File, USB 해제, Print, Email Mock 이벤트 생성
+* 기존 SecurityEvent 모델과 metadata 구조 재사용
+* Kafka 발행 및 PostgreSQL 저장
+* Dashboard 이벤트 타임라인 표시
+
+### Phase 11. Privacy & Data Protection
+
+* 내부 IP 익명화 옵션 구현
+* 민감 도메인 마스킹 옵션 구현
+* 이벤트 보관 기간 설정
+* 보관 기간이 지난 이벤트 정리
+* 이벤트 조회 API 접근 로그 기록
+
+### Phase 12. 문서화 / 시연
 
 * README 정리
-* 시스템 구조 문서화
-* 이벤트 처리 흐름 문서화
-* 이벤트 모델 문서화
-* Rule-based Analyzer 문서화
+* 시스템 구조와 이벤트 처리 흐름 문서화
+* 이벤트 모델과 Rule-based Analyzer 문서화
+* Storage API와 WebSocket 구조 문서화
+* DNS 및 Network Flow Collector 문서화
 * 보안 및 Privacy Boundary 명시
-* 실행 방법 정리
-* 시연 시나리오 작성
+* 실행 방법과 시연 시나리오 정리
 * 실행 화면 및 로그 추가
 
 ---
@@ -600,6 +638,7 @@ officeguard-lab/
  ├─ backend/
  │   ├─ src/
  │   │   ├─ analyzer/
+ │   │   ├─ collectors/
  │   │   ├─ config/
  │   │   ├─ events/
  │   │   ├─ mock/
@@ -616,9 +655,6 @@ officeguard-lab/
  │
  ├─ dashboard/
  │   └─ src/
- │
- ├─ agent/
- │   └─ mock/
  │
  ├─ infra/
  │   ├─ postgres/
