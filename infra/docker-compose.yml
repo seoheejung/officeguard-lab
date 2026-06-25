@@ -111,7 +111,7 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER is required}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
 
-    # Express 서버 포트 연결
+    # Express 및 WebSocket 서버 포트 연결
     ports:
       - "${PORT:?PORT is required}:${PORT:?PORT is required}"
 
@@ -137,6 +137,44 @@ services:
       timeout: 3s
       retries: 5
       start_period: 5s
+
+  # OfficeGuard Lab Realtime Dashboard
+  dashboard:
+    build:
+      context: ../dashboard
+      dockerfile: Dockerfile
+
+    container_name: officeguard-lab-dashboard
+
+    # Dashboard 실행 및 Backend Proxy 환경 변수
+    environment:
+      DASHBOARD_PORT: ${DASHBOARD_PORT:?DASHBOARD_PORT is required}
+      DASHBOARD_BACKEND_URL: ${DASHBOARD_DOCKER_BACKEND_URL:?DASHBOARD_DOCKER_BACKEND_URL is required}
+
+    # Vite Dashboard 공개 포트 연결
+    ports:
+      - "${DASHBOARD_PORT:?DASHBOARD_PORT is required}:${DASHBOARD_PORT:?DASHBOARD_PORT is required}"
+
+    # Backend 준비 완료 후 Dashboard 시작
+    depends_on:
+      backend:
+        condition: service_healthy
+
+    restart: unless-stopped
+
+    # Vite Dashboard 응답 상태 확인
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:' + process.env.DASHBOARD_PORT).then((response) => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))"
+        ]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
 
 # PostgreSQL 데이터 영속화
 volumes:
