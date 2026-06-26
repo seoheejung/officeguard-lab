@@ -1,12 +1,12 @@
 import type { SecurityEventBase } from './eventTypes.js';
 
 /**
- * 초기 Network Flow 이벤트에서 처리할 전송 계층 프로토콜
+ * Network Flow 전송 계층 Protocol
  */
 export type NetworkProtocol = 'TCP' | 'UDP';
 
 /**
- * NETWORK_FLOW 이벤트의 세부 데이터
+ * NETWORK_FLOW 이벤트 세부 데이터
  */
 export interface NetworkFlowMetadata {
   /**
@@ -15,12 +15,12 @@ export interface NetworkFlowMetadata {
   destinationIp: string;
 
   /**
-   * 연결 대상 포트
+   * 연결 대상 Port
    */
   destinationPort: number;
 
   /**
-   * 연결에 사용된 프로토콜
+   * 연결에 사용된 Protocol
    */
   protocol: NetworkProtocol;
 
@@ -30,19 +30,18 @@ export interface NetworkFlowMetadata {
   domain?: string;
 
   /**
-   * 관측된 inbound byte 수
+   * 관측 가능한 경우 기록하는 inbound byte 수
    */
-  bytesIn: number;
+  bytesIn?: number;
 
   /**
-   * 관측된 outbound byte 수
+   * 관측 가능한 경우 기록하는 outbound byte 수
    */
-  bytesOut: number;
+  bytesOut?: number;
 }
 
 /**
- * 단말과 목적지 사이의 네트워크 연결 흐름을 나타내는 이벤트
- * 초기 단계에서는 실제 패킷을 수집하지 않고 Mock 이벤트로 사용
+ * Mini PC와 목적지 사이의 네트워크 연결 이벤트
  */
 export type NetworkFlowEvent = SecurityEventBase<
   'NETWORK_FLOW',
