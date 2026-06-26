@@ -155,7 +155,6 @@ Rule 조건 평가
 → Producer 연결
 → Consumer 연결 및 Handler 등록
 → HTTP 및 WebSocket 서버 실행
-→ Mock Event Generator 실행
 ```
 
 > WebSocket 서버 객체는 애플리케이션 초기화 과정에서 생성하지만, 실제 Client 연결은 HTTP 서버가 지정된 Port에서 실행된 이후부터 받을 수 있다.
@@ -196,6 +195,24 @@ Mini PC Agent
 ├─ 프린트 이벤트 수집
 └─ 테스트 메일 첨부 전송 이벤트 생성
 ```
+
+### Event Receiver
+
+#### Mini PC Agent 이벤트 수신 Endpoint
+
+```text
+POST /api/agent/events
+```
+
+#### Event Receiver 수행 작업
+
+```text
+DNS_QUERY 수신
+→ 요청 데이터 검증
+→ 기존 Kafka Producer 전달
+```
+
+PostgreSQL 저장, Rule 분석 및 WebSocket 전달은 기존 Event Pipeline에서 처리한다.
 
 ### DNS 관측
 
@@ -464,15 +481,25 @@ metadata.ruleId + occurred_at
 
 실제 환경 변수 값은 README에 작성하지 않고 `infra/.env.example`에서 변수 항목만 관리한다.
 
-Mini PC Agent와 Event Receiver에 필요한 환경 변수는 해당 Phase에서 실제 전송 방식과 실행 구성을 확정한 뒤 추가한다.
+### Mini PC Agent
+
+Mini PC Agent는 실행 파일과 같은 디렉터리의 `.env`를 사용한다.
+
+| 환경 변수                      | 역할                              |
+| -------------------------- | ------------------------------- |
+| `AGENT_RECEIVER_URL`       | Main PC Event Receiver 전체 URL   |
+| `AGENT_DEVICE_ID`          | Mini PC 식별자                     |
+| `AGENT_USER_ALIAS`         | 익명화된 사용자 별칭                     |
+| `AGENT_NETWORK_INTERFACE`  | Mini PC 내부 IPv4 조회 대상 Interface |
+| `AGENT_REQUEST_TIMEOUT_MS` | Event Receiver 요청 제한 시간         |
+
+Agent의 실제 환경 변수 값은 Git에 포함하지 않는다.
 
 ---
 
 ## 실행 방법
 
-현재 실행 방법은 Phase 7까지 구현된 Main PC Backend, Kafka, PostgreSQL, Dashboard와 Mock Event Generator를 기준으로 한다.
-
-Mini PC Agent 실행 방법은 Phase 8에서 단일 실행 파일 구성이 완료된 뒤 추가한다.
+현재 실행 방법은 Main PC의 Backend, Kafka, PostgreSQL, Dashboard와 Mini PC Agent 실행 구성을 기준으로 한다.
 
 ### 로컬 실행
 
@@ -582,6 +609,46 @@ docker compose --env-file .\infra\.env -f .\infra\docker-compose.yml down
 
 ---
 
+## Mini PC Agent 실행
+
+### Main PC에서 Agent 실행 파일 생성
+
+```powershell
+cd agent
+
+pnpm install
+pnpm typecheck
+pnpm build
+```
+
+### 생성 파일
+
+```text
+agent/dist/officeguard-agent.exe
+```
+
+Mini PC에는 `officeguard-agent.exe`와 `.env`만 배치
+
+```text
+D:\DEV\OfficeGuardLab\
+├─ officeguard-agent.exe
+└─ .env
+```
+
+Mini PC에는 Node.js, pnpm, TypeScript 및 프로젝트 의존성을 설치하지 않는다.
+
+### Mini PC CMD에서 실행
+
+```cmd
+cd /d D:\DEV\OfficeGuardLab
+officeguard-agent.exe
+```
+
+> Agent는 Windows DNS Client Operational Log의 Event ID `3008`을 구독하고, 
+> 실제 DNS 요청을 `DNS_QUERY` 이벤트로 변환해 Main PC로 전송한다.
+
+---
+
 ## 진행 단계
 
 ### Phase 1. 프로젝트 초기 구성 ✅ 완료
@@ -665,20 +732,23 @@ docker compose --env-file .\infra\.env -f .\infra\docker-compose.yml down
 * Rule Hit과 WebSocket 연결 상태 표시
 * Charm 스타일 터미널 관제 UI 적용
 
-### Phase 8. Mini PC Agent 기본 구성 및 DNS Event 연동
+### Phase 8. Mini PC Agent 기본 구성 및 DNS Event 연동 ✅ 완료
 
 * Main PC Event Receiver 구성
 * Mini PC Agent 프로젝트 구성
-* Mini PC Agent 단일 실행 파일 생성
+* Node.js SEA 기반 단일 실행 파일 생성
 * 설치 없이 Agent 수동 실행
-* Mini PC의 실제 DNS 요청 기록 수집 방식 확정
-* DNS 요청 기록 수집
-* 수집한 DNS 기록을 `DNS_QUERY` 이벤트로 변환
-* 내부망을 통해 Main PC Event Receiver로 전송
-* 수신 데이터 검증 및 Kafka 발행
+* Windows DNS Client Event ID `3008` 구독
+* Mini PC의 실제 DNS 요청 기록 수집
+* DNS 기록의 `DNS_QUERY` 이벤트 변환
+* 내부망을 통한 Main PC Event Receiver 전송
+* 수신 데이터 검증 및 잘못된 이벤트 차단
+* 기존 Kafka Topic 발행 및 Consumer 수신
 * PostgreSQL 저장
+* Rule-based Analyzer 처리
 * WebSocket 실시간 전달
-* Dashboard 표시
+* Realtime Dashboard 표시
+
 
 ### Phase 9. Mini PC Agent Network Flow 수집
 
@@ -775,8 +845,11 @@ officeguard-lab/
  │   │   ├─ collectors/
  │   │   ├─ config/
  │   │   ├─ events/
+ │   │   ├─ network/
+ │   │   ├─ sender/
  │   │   └─ index.ts
  │   ├─ package.json
+ │   ├─ sea-config.json
  │   ├─ pnpm-lock.yaml
  │   └─ tsconfig.json
  │
