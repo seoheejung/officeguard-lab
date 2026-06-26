@@ -1,81 +1,127 @@
 import { Router } from 'express';
 
-import type {
-  DnsQueryEvent,
-} from '../events/index.js';
-import {
-  publishSecurityEvent,
-} from '../pipeline/eventPipeline.js';
+import type { DnsQueryEvent, NetworkFlowEvent } from '../events/index.js';
+import { publishSecurityEvent } from '../pipeline/eventPipeline.js';
 import {
   DnsQueryEventValidationError,
   parseDnsQueryEvent,
 } from './dnsQueryEventValidator.js';
+import {
+  NetworkFlowEventValidationError,
+  parseNetworkFlowEvent,
+} from './networkFlowEventValidator.js';
 
-// Mini PC Agent Event Receiver Router 생성
-export const agentEventReceiverRouter =
-  Router();
+type AgentSecurityEvent = DnsQueryEvent | NetworkFlowEvent;
 
 /**
- * Mini PC Agent DNS_QUERY 수신
+ * Agent Event Receiver 공통 검증 오류
  */
-agentEventReceiverRouter.post(
-  '/events',
-  async (request, response) => {
-    // 검증 완료 DNS_QUERY 이벤트 저장 변수
-    let event: DnsQueryEvent;
+class AgentEventValidationError extends Error {
+  public constructor(message: string) {
+    super(message);
+    this.name = 'AgentEventValidationError';
+  }
+}
 
-    try {
-      // 외부 요청 Body의 unknown 타입 처리
-      const requestBody: unknown = request.body;
+/**
+ * 일반 객체 여부 확인
+ */
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
 
-      // DNS_QUERY 구조 검증 및 이벤트 재구성
-      event = parseDnsQueryEvent( requestBody );
-    } catch (error) {
-      // 예상 가능한 수신 데이터 검증 오류 처리
-      if ( error instanceof DnsQueryEventValidationError ) {
-        // 검증 실패 원인 로그 출력
-        console.error( `[event-receiver] invalid DNS_QUERY. reason=${error.message}` );
+/**
+ * Agent SecurityEvent 타입별 검증
+ */
+const parseAgentEvent = (value: unknown): AgentSecurityEvent => {
+  // 요청 Body 객체 형식 검증
+  if (!isRecord(value)) {
+    throw new AgentEventValidationError( 'request body must be a JSON object' );
+  }
 
-        // 잘못된 DNS_QUERY 응답 반환
-        response.status(400).json({
-          error: 'invalid_dns_query',
-          message: error.message,
-        });
+  // 이벤트 타입별 Validator 호출
+  switch (value.eventType) {
+    case 'DNS_QUERY':
+      return parseDnsQueryEvent(value);
 
-        return;
-      }
+    case 'NETWORK_FLOW':
+      return parseNetworkFlowEvent(value);
 
-      // 예상하지 못한 검증 오류 로그 출력
-      console.error( '[event-receiver] validation failed:', error );
+    default:
+      throw new AgentEventValidationError( 'eventType must be DNS_QUERY or NETWORK_FLOW' );
+  }
+};
 
-      // 일반 검증 실패 응답 반환
+// Mini PC Agent Event Receiver Router 생성
+export const agentEventReceiverRouter = Router();
+
+/**
+ * Mini PC Agent SecurityEvent 수신
+ */
+agentEventReceiverRouter.post('/events', async (request, response) => {
+  let event: AgentSecurityEvent;
+
+  try {
+    // 외부 요청 Body의 unknown 타입 처리
+    const requestBody: unknown = request.body;
+
+    // 이벤트 타입별 구조 검증
+    event = parseAgentEvent(requestBody);
+  } catch (error) {
+    let errorCode = 'invalid_agent_event';
+
+    // DNS_QUERY 검증 오류 구분
+    if (error instanceof DnsQueryEventValidationError) {
+      errorCode = 'invalid_dns_query';
+    }
+
+    // NETWORK_FLOW 검증 오류 구분
+    if (error instanceof NetworkFlowEventValidationError) {
+      errorCode = 'invalid_network_flow';
+    }
+
+    // 예상 가능한 검증 오류 처리
+    if (
+      error instanceof AgentEventValidationError ||
+      error instanceof DnsQueryEventValidationError ||
+      error instanceof NetworkFlowEventValidationError
+    ) {
+      console.error( `[event-receiver] invalid event. reason=${error.message}` );
+
       response.status(400).json({
-        error: 'invalid_dns_query',
+        error: errorCode,
+        message: error.message,
       });
 
       return;
     }
 
-    try {
-      // 검증 완료 이벤트의 기존 Event Pipeline 발행
-      await publishSecurityEvent(event);
+    // 예상하지 못한 검증 오류 처리
+    console.error('[event-receiver] validation failed:', error);
 
-      // Event Receiver 수신 및 발행 완료 로그 출력
-      console.log( `[event-receiver] accepted. eventType=${event.eventType} eventId=${event.eventId} sourceIp=${event.sourceIp}` );
+    response.status(400).json({
+      error: 'invalid_agent_event',
+    });
 
-      // 비동기 처리 접수 완료 응답 반환
-      response.status(202).json({
-        status: 'accepted',
-        eventId: event.eventId,
-      });
-    } catch (error) {
-      // Kafka Event Pipeline 발행 실패 로그 출력
-      console.error( `[event-receiver] publish failed. eventType=${event.eventType} eventId=${event.eventId}`, error );
+    return;
+  }
 
-      // 이벤트 발행 실패 응답 반환
-      response.status(500).json({
-        error: 'event_publish_failed',
-      });
-    }
-  },
-);
+  try {
+    // 검증 완료 이벤트의 기존 Pipeline 발행
+    await publishSecurityEvent(event);
+
+    console.log( `[event-receiver] accepted. eventType=${event.eventType} eventId=${event.eventId} sourceIp=${event.sourceIp}` );
+
+    // 비동기 처리 접수 완료 응답
+    response.status(202).json({
+      status: 'accepted',
+      eventId: event.eventId,
+    });
+  } catch (error) {
+    // Kafka 발행 실패 처리
+    console.error( `[event-receiver] publish failed. eventType=${event.eventType} eventId=${event.eventId}`, error );
+
+    response.status(500).json({
+      error: 'event_publish_failed',
+    });
+  }
+});
