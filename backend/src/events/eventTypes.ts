@@ -19,8 +19,7 @@ export type EndpointEventType =
   | 'FILE_COPIED'
   | 'USB_CONNECTED'
   | 'USB_DISCONNECTED'
-  | 'PRINT_REQUESTED'
-  | 'EMAIL_ATTACHMENT_SENT';
+  | 'PRINT_REQUESTED';
 
 /**
  * Rule-based Analyzer가 생성하는 이벤트 타입

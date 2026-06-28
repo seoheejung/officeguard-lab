@@ -9,7 +9,6 @@ export type SecurityEventType =
   | 'USB_CONNECTED'
   | 'USB_DISCONNECTED'
   | 'PRINT_REQUESTED'
-  | 'EMAIL_ATTACHMENT_SENT'
   | 'RULE_HIT';
 
 export type SecuritySeverity =

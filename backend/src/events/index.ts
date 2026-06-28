@@ -23,8 +23,6 @@ export type {
 } from './networkFlowEvent.js';
 
 export type {
-  EmailAttachmentSentEvent,
-  EmailAttachmentSentMetadata,
   EndpointEvent,
   FileCopiedEvent,
   FileCopiedMetadata,

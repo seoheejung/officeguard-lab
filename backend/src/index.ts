@@ -4,10 +4,8 @@ import express from 'express';
 
 import { RuleBasedAnalyzer } from './analyzer/ruleBasedAnalyzer.js';
 import { analyzerConfig } from './config/analyzerConfig.js';
-import { mockEventConfig } from './config/mockEventConfig.js';
 import { serverConfig } from './config/serverConfig.js';
 import type { SecurityEvent } from './events/index.js';
-// import { startMockEventGenerator } from './mock/mockEventGenerator.js';
 import { publishSecurityEvent, startEventPipeline } from './pipeline/eventPipeline.js';
 import { agentEventReceiverRouter } from './receiver/agentEventReceiverRouter.js';
 import { securityEventRouter } from './routes/securityEventRoutes.js';
@@ -135,14 +133,7 @@ const startApplication =
       '0.0.0.0',
       () => {
         console.log( `[server] ${serverConfig.serviceName} listening on port ${serverConfig.port}` );
-
         console.log( '[websocket] server listening on path /ws' );
-
-        // 실제 Agent 이벤트 검증을 위한 Mock Event Generator 비활성화
-        // startMockEventGenerator(
-        //   mockEventConfig.intervalMs,
-        //   publishSecurityEvent,
-        // );
       },
     );
   };
