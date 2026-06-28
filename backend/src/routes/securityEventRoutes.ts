@@ -31,7 +31,6 @@ const securityEventTypes = new Set<string>([
   'USB_CONNECTED',
   'USB_DISCONNECTED',
   'PRINT_REQUESTED',
-  'EMAIL_ATTACHMENT_SENT',
   'RULE_HIT',
 ]);
 

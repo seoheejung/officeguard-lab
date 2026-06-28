@@ -69,15 +69,6 @@ export interface PrintRequestedMetadata {
 }
 
 /**
- * 외부 메일 첨부 전송 이벤트의 세부 데이터
- */
-export interface EmailAttachmentSentMetadata {
-  destinationDomain: string;
-  attachmentCount: number;
-  totalSizeBytes?: number;
-}
-
-/**
  * 프로세스 실행 이벤트
  */
 export type ProcessStartEvent = EndpointSecurityEvent<
@@ -142,14 +133,6 @@ export type PrintRequestedEvent = EndpointSecurityEvent<
 >;
 
 /**
- * 외부 메일 첨부 전송 이벤트
- */
-export type EmailAttachmentSentEvent = EndpointSecurityEvent<
-  'EMAIL_ATTACHMENT_SENT',
-  EmailAttachmentSentMetadata
->;
-
-/**
  * OfficeGuard Lab에서 처리하는 전체 Endpoint 이벤트
  */
 export type EndpointEvent =
@@ -160,5 +143,4 @@ export type EndpointEvent =
   | FileCopiedEvent
   | UsbConnectedEvent
   | UsbDisconnectedEvent
-  | PrintRequestedEvent
-  | EmailAttachmentSentEvent;
+  | PrintRequestedEvent;
