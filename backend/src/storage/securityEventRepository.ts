@@ -259,3 +259,21 @@ export const findSecurityEventById = async (
     ? undefined
     : mapStoredSecurityEvent(row);
 };
+
+/**
+ * stored_at 기준 보관 기간 초과 SecurityEvent 삭제
+ */
+export const deleteExpiredSecurityEvents = async (
+  retentionDays: number,
+): Promise<number> => {
+  const result = await storagePool.query(
+    `
+      DELETE FROM security_events
+      WHERE stored_at < NOW() - ($1::integer * INTERVAL '1 day')
+    `,
+    [retentionDays],
+  );
+
+  // 실제 삭제된 이벤트 수 반환
+  return result.rowCount ?? 0;
+};

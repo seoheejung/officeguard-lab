@@ -83,6 +83,7 @@ flowchart TD
         Producer["Kafka Producer"]
         Topic["SecurityEvent Topic"]
         Consumer["Kafka Consumer"]
+        Privacy["Privacy Protector<br/>IP 익명화 · 도메인 마스킹"]
         Storage["PostgreSQL"]
         Analyzer["Rule-based Analyzer"]
         WebSocket["WebSocket Server"]
@@ -94,10 +95,11 @@ flowchart TD
     Producer --> Topic
     Topic --> Consumer
 
-    Consumer --> Storage
-    Consumer --> Analyzer
-    Consumer --> WebSocket
+    Consumer --> Privacy
+    Privacy --> Storage
+    Privacy --> WebSocket
 
+    Consumer --> Analyzer
     Analyzer -->|"RULE_HIT 재발행"| Producer
     WebSocket --> Dashboard
 ```
@@ -126,12 +128,14 @@ Main PC Event Receiver
                ▼
          Kafka Consumer
                │
-               ├─ PostgreSQL 저장
+               ├─ 보호 사본 생성
+               │      ├─ Source IP 익명화
+               │      └─ 민감 도메인 마스킹
+               │             ├─ PostgreSQL 저장
+               │             └─ WebSocket 실시간 전달
+               │                    └─ Realtime Dashboard
                │
-               ├─ WebSocket 실시간 전달
-               │      └─ Realtime Dashboard
-               │
-               └─ Rule-based Analyzer
+               └─ 원본 이벤트 Rule-based Analyzer 평가
                       │
                       ├─ 조건 불충족
                       │      └─ 분석 종료
@@ -150,6 +154,7 @@ Main PC Event Receiver
                              ▼
                       Consumer 재수신
                              │
+                             ├─ 보호 설정 적용
                              ├─ PostgreSQL 저장
                              ├─ WebSocket 실시간 전달
                              └─ Analyzer 재분석 제외
@@ -158,15 +163,15 @@ Main PC Event Receiver
 ### 현재 Backend 실행 순서
 
 ```text
-환경 변수 검증
+환경 변수 및 Privacy 설정 검증
 → RuleBasedAnalyzer 인스턴스 생성
 → Express 애플리케이션 및 조회 API 구성
-→ HTTP 서버 생성
-→ HTTP 서버에 WebSocket Endpoint 연결
+→ HTTP 서버와 WebSocket Endpoint 구성
 → PostgreSQL 연결 확인
+→ 보관 기간 초과 이벤트 즉시 정리
+→ 반복 정리 Timer 등록
 → Kafka Topic 확인
-→ Producer 연결
-→ Consumer 연결 및 Handler 등록
+→ Producer 및 Consumer 연결
 → HTTP 및 WebSocket 서버 실행
 ```
 
@@ -302,6 +307,29 @@ GET /api/rule-hits
 * Severity별 Rule Hit 표시
 * HIGH / CRITICAL Rule Hit 건수
 
+### Privacy & Data Protection
+
+Kafka Consumer가 수신한 원본 이벤트는 기존 Rule-based Analyzer 평가에 사용하고, PostgreSQL 저장과 Dashboard 전달에는 보호 설정이 적용된 사본을 사용한다.
+
+```text
+원본 SecurityEvent
+├─ Rule-based Analyzer 평가
+└─ 보호 사본 생성
+   ├─ Source IP 익명화
+   └─ 민감 도메인 마스킹
+      ├─ PostgreSQL 저장
+      └─ WebSocket 전달
+```
+
+* HMAC-SHA256 기반 `sourceIp` 익명 식별자 생성
+* 동일한 Source IP의 일관된 익명 식별자 유지
+* 민감 도메인의 `metadata.domain`과 `message` 마스킹
+* 마스킹 전 원본 도메인을 사용한 기존 Analyzer Rule 유지
+* `stored_at` 기준 이벤트 보관 기간 적용
+* Backend 시작 시 및 설정 주기에 따른 만료 이벤트 정리
+* 이벤트 조회 API 접근 로그 기록
+* 접근 로그의 Query String과 응답 데이터 제외
+
 ---
 
 ## 이벤트 모델
@@ -374,7 +402,7 @@ RULE_HIT
 | `event_id`    | `TEXT`        | 이벤트 고유 ID 및 Primary Key |
 | `event_type`  | `TEXT`        | `DNS_QUERY`, `FILE_COPIED`, `RULE_HIT` 등의 이벤트 타입 |
 | `occurred_at` | `TIMESTAMPTZ` | 원본 이벤트 발생 시각 |
-| `source_ip`   | `TEXT`        | 이벤트가 발생한 내부 IP |
+| `source_ip`   | `TEXT`        | 원본 또는 익명화된 이벤트 출처 식별자 |
 | `device_id`   | `TEXT`        | 테스트 단말 식별자 |
 | `user_alias`  | `TEXT`        | 익명화된 사용자 별칭 |
 | `severity`    | `TEXT`        | Rule Hit 위험도 |
@@ -476,8 +504,16 @@ metadata.ruleId + occurred_at
 | `DASHBOARD_PORT` | Dashboard Vite 서버 포트 |
 | `DASHBOARD_BACKEND_URL` | 로컬 Dashboard용 Backend 주소 |
 | `DASHBOARD_DOCKER_BACKEND_URL` | Docker Dashboard용 Backend 주소 |
+| `PRIVACY_SOURCE_IP_ANONYMIZATION_ENABLED` | Source IP 익명화 활성화 여부 |
+| `PRIVACY_SOURCE_IP_ANONYMIZATION_KEY` | HMAC-SHA256 익명화 Key |
+| `PRIVACY_DOMAIN_MASKING_ENABLED` | 민감 도메인 마스킹 활성화 여부 |
+| `PRIVACY_SENSITIVE_DOMAINS` | 쉼표 구분 민감 도메인 목록 |
+| `PRIVACY_EVENT_RETENTION_DAYS` | 이벤트 보관 일수 |
+| `PRIVACY_RETENTION_CLEANUP_INTERVAL_MS` | 만료 이벤트 정리 실행 주기 |
 
-환경 변수는 모두 필수이며 코드 내부 기본값을 사용하지 않는다.
+환경 변수는 코드 내부 실행값 기본값을 사용하지 않는다.
+
+익명화 Key와 민감 도메인 목록은 해당 보호 기능을 활성화한 경우에만 필수로 사용한다.
 
 실제 환경 변수 값은 README에 작성하지 않고 `infra/.env.example`에서 변수 항목만 관리한다.
 
@@ -609,6 +645,9 @@ docker compose --env-file .\infra\.env -f .\infra\docker-compose.yml logs -f das
 
 ```powershell
 docker compose --env-file .\infra\.env -f .\infra\docker-compose.yml down
+
+# Volume 삭제
+docker compose --env-file .\infra\.env -f .\infra\docker-compose.yml down -v
 ```
 
 ---
@@ -787,13 +826,18 @@ officeguard-agent.exe
 * Mock Event Generator 제거
 * Phase 2에서 정의한 테스트 메일 첨부 전송 기능은 Phase 10 구현 및 검증 범위에서 제외
 
-### Phase 11. Privacy & Data Protection
+### Phase 11. Privacy & Data Protection ✅ 완료
 
-* 내부 IP 익명화 옵션 구현
-* 민감 도메인 마스킹 옵션 구현
-* 이벤트 보관 기간 설정
-* 보관 기간이 지난 이벤트 정리
+* HMAC-SHA256 기반 Source IP 익명화
+* 동일 Source IP의 일관된 익명 식별자 유지
+* 원본 IP와 익명 식별자를 이용한 조회 필터 지원
+* 민감 도메인과 하위 도메인의 `metadata.domain` 및 `message` 마스킹
+* 마스킹 전 원본 이벤트를 사용한 기존 Analyzer Rule 유지
+* `stored_at` 기준 이벤트 보관 기간 적용
+* Backend 시작 시 및 설정 주기에 따른 만료 이벤트 정리
 * 이벤트 조회 API 접근 로그 기록
+* 접근 로그 Client IP 보호 처리
+* PostgreSQL 및 Dashboard 보호 데이터 표시 검증
 
 ### Phase 12. 문서화 / 시연
 
@@ -824,77 +868,82 @@ officeguard-agent.exe
 * 사용자 실명 대신 익명화된 별칭 사용
 * 실제 USB 시리얼 번호 저장 금지
 * 로컬 환경 변수와 런타임 데이터 Git 제외
+* 개인정보 보호 설정 활성화 시 PostgreSQL과 Dashboard의 Source IP 익명화
+* 민감 도메인의 저장 데이터와 Dashboard 표시 값 마스킹
+* 이벤트 보관 기간 적용 및 조회 API 접근 로그 최소 기록
 
 ---
 
-## 예상 디렉터리 구조
+## 디렉터리 구조
 
 ```text
 officeguard-lab/
- ├─ backend/
- │   ├─ src/
- │   │   ├─ analyzer/
- │   │   ├─ config/
- │   │   ├─ events/
- │   │   ├─ pipeline/
- │   │   ├─ receiver/
- │   │   ├─ routes/
- │   │   ├─ storage/
- │   │   ├─ websocket/
- │   │   └─ index.ts
- │   ├─ Dockerfile
- │   ├─ package.json
- │   ├─ pnpm-lock.yaml
- │   └─ tsconfig.json
- │
- ├─ agent/
- │   ├─ src/
- │   │   ├─ collectors/
- │   │   ├─ config/
- │   │   ├─ events/
- │   │   ├─ files/
- │   │   ├─ network/
- │   │   ├─ sender/
- │   │   └─ index.ts
- │   ├─ package.json
- │   ├─ sea-config.json
- │   ├─ pnpm-lock.yaml
- │   └─ tsconfig.json
- │
- ├─ dashboard/
- │   ├─ src/
- │   │   ├─ hooks/
- │   │   ├─ types/
- │   │   ├─ App.tsx
- │   │   ├─ main.tsx
- │   │   ├─ styles.css
- │   │   └─ vite-env.d.ts
- │   ├─ Dockerfile
- │   ├─ index.html
- │   ├─ package.json
- │   ├─ pnpm-lock.yaml
- │   ├─ tsconfig.json
- │   └─ vite.config.ts
- │
- ├─ infra/
- │   ├─ postgres/
- │   │   └─ init/
- │   ├─ .env.example
- │   └─ docker-compose.yml
- │
- ├─ docs/
- │   ├─ agent.md
- │   ├─ architecture.md
- │   ├─ dashboard.md
- │   ├─ event-model.md
- │   ├─ event-receiver.md
- │   ├─ privacy.md
- │   ├─ rules.md
- │   ├─ storage-api.md
- │   └─ websocket.md
- │
- ├─ .gitignore
- └─ README.md
+├─ backend/
+│  ├─ src/
+│  │  ├─ analyzer/
+│  │  ├─ config/
+│  │  ├─ events/
+│  │  ├─ middleware/
+│  │  ├─ pipeline/
+│  │  ├─ privacy/
+│  │  ├─ receiver/
+│  │  ├─ routes/
+│  │  ├─ storage/
+│  │  ├─ websocket/
+│  │  └─ index.ts
+│  ├─ Dockerfile
+│  ├─ package.json
+│  ├─ pnpm-lock.yaml
+│  └─ tsconfig.json
+│
+├─ agent/
+│  ├─ src/
+│  │  ├─ collectors/
+│  │  ├─ config/
+│  │  ├─ events/
+│  │  ├─ files/
+│  │  ├─ network/
+│  │  ├─ sender/
+│  │  └─ index.ts
+│  ├─ .env.example
+│  ├─ package.json
+│  ├─ pnpm-lock.yaml
+│  └─ sea-config.json
+│  └─ tsconfig.json
+│
+├─ dashboard/
+│  ├─ src/
+│  │  ├─ hooks/
+│  │  ├─ types/
+│  │  ├─ App.tsx
+│  │  ├─ main.tsx
+│  │  ├─ styles.css
+│  │  └─ vite-env.ts
+│  ├─ Dockerfile
+│  ├─ index.html
+│  ├─ package.json
+│  ├─ pnpm-lock.yaml
+│  ├─ tsconfig.json
+│  └─ vite.config.ts
+│
+├─ infra/
+│  ├─ postgres/
+│  │  └─ init/
+│  ├─ .env.example
+│  └─ docker-compose.yml
+│
+├─ docs/
+│  ├─ agent.md
+│  ├─ architecture.md
+│  ├─ dashboard.md
+│  ├─ event-model.md
+│  ├─ event-receiver.md
+│  ├─ privacy.md
+│  ├─ rules.md
+│  ├─ storage-api.md
+│  └─ websocket.md
+│
+└─ README.md
 ```
 
 `backend/src/mock/`은 실제 DNS, Network Flow, Endpoint Event 수집 흐름을 구성한 Phase 10에서 제거했다.

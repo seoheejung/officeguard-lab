@@ -5,6 +5,8 @@ import type {
   SecurityEventType,
   SecuritySeverity,
 } from '../events/index.js';
+import { securityEventAccessLogger } from '../middleware/securityEventAccessLogger.js';
+import { privacyProtector } from '../privacy/privacyProtector.js';
 import {
   findSecurityEventById,
   findSecurityEvents,
@@ -54,6 +56,9 @@ class QueryValidationError extends Error {}
  */
 export const securityEventRouter = Router();
 
+// 이벤트 조회 API 접근 로그 기록
+securityEventRouter.use(securityEventAccessLogger);
+
 /**
  * 단일 Query Parameter 조회
  */
@@ -68,9 +73,7 @@ const getOptionalQueryValue = (
 
   // 배열 등 복수 Query Parameter 차단
   if (typeof value !== 'string') {
-    throw new QueryValidationError(
-      `${name} must be a single string value`,
-    );
+    throw new QueryValidationError( `${name} must be a single string value` );
   }
 
   // 앞뒤 공백 제거
@@ -78,9 +81,7 @@ const getOptionalQueryValue = (
 
   // 빈 문자열 Query Parameter 차단
   if (trimmedValue === '') {
-    throw new QueryValidationError(
-      `${name} must not be empty`,
-    );
+    throw new QueryValidationError( `${name} must not be empty` );
   }
 
   return trimmedValue;
@@ -95,23 +96,14 @@ const parseLimit = (value: unknown): number => {
     return DEFAULT_QUERY_LIMIT;
   }
 
-  const rawValue = getOptionalQueryValue(
-    value,
-    'limit',
-  );
+  const rawValue = getOptionalQueryValue(value, 'limit');
 
   // 문자열 Query Parameter의 숫자 변환
   const limit = Number(rawValue);
 
   // 정수 범위 검증
-  if (
-    !Number.isInteger(limit) ||
-    limit < 1 ||
-    limit > MAX_QUERY_LIMIT
-  ) {
-    throw new QueryValidationError(
-      `limit must be an integer between 1 and ${MAX_QUERY_LIMIT}`,
-    );
+  if ( !Number.isInteger(limit) || limit < 1 || limit > MAX_QUERY_LIMIT ) {
+    throw new QueryValidationError( `limit must be an integer between 1 and ${MAX_QUERY_LIMIT}` );
   }
 
   return limit;
@@ -123,10 +115,7 @@ const parseLimit = (value: unknown): number => {
 const parseEventType = (
   value: unknown,
 ): SecurityEventType | undefined => {
-  const eventType = getOptionalQueryValue(
-    value,
-    'eventType',
-  );
+  const eventType = getOptionalQueryValue(value, 'eventType');
 
   if (eventType === undefined) {
     return undefined;
@@ -134,9 +123,7 @@ const parseEventType = (
 
   // 지원하지 않는 이벤트 타입 차단
   if (!securityEventTypes.has(eventType)) {
-    throw new QueryValidationError(
-      `unsupported eventType: ${eventType}`,
-    );
+    throw new QueryValidationError( `unsupported eventType: ${eventType}` );
   }
 
   return eventType as SecurityEventType;
@@ -148,10 +135,7 @@ const parseEventType = (
 const parseSeverity = (
   value: unknown,
 ): SecuritySeverity | undefined => {
-  const severity = getOptionalQueryValue(
-    value,
-    'severity',
-  );
+  const severity = getOptionalQueryValue(value, 'severity');
 
   if (severity === undefined) {
     return undefined;
@@ -159,9 +143,7 @@ const parseSeverity = (
 
   // 지원하지 않는 Severity 차단
   if (!securitySeverities.has(severity)) {
-    throw new QueryValidationError(
-      `unsupported severity: ${severity}`,
-    );
+    throw new QueryValidationError( `unsupported severity: ${severity}` );
   }
 
   return severity as SecuritySeverity;
@@ -174,10 +156,7 @@ const parseTimestamp = (
   value: unknown,
   name: string,
 ): string | undefined => {
-  const timestamp = getOptionalQueryValue(
-    value,
-    name,
-  );
+  const timestamp = getOptionalQueryValue(value, name);
 
   if (timestamp === undefined) {
     return undefined;
@@ -187,9 +166,7 @@ const parseTimestamp = (
   const timestampMs = Date.parse(timestamp);
 
   if (Number.isNaN(timestampMs)) {
-    throw new QueryValidationError(
-      `${name} must be a valid timestamp`,
-    );
+    throw new QueryValidationError( `${name} must be a valid timestamp` );
   }
 
   // PostgreSQL 조회용 UTC ISO 8601 형식 변환
@@ -210,9 +187,7 @@ const validateTimeRange = (
 
   // 역전된 조회 시간 범위 차단
   if (Date.parse(from) > Date.parse(to)) {
-    throw new QueryValidationError(
-      'from must be earlier than or equal to to',
-    );
+    throw new QueryValidationError( 'from must be earlier than or equal to to' );
   }
 };
 
@@ -233,88 +208,77 @@ const sendQueryError = (
   }
 
   // 내부 Storage 조회 오류 기록
-  console.error('[storage-api] query failed:', error);
+  console.error( '[storage-api] query failed:', error );
 
   // 내부 오류 상세 정보 비노출
   response.status(500).json({
-    error: 'storage_query_failed',
+    error: 'storage_query_failed'
   });
 };
 
 /**
  * SecurityEvent 목록 조회
  */
-securityEventRouter.get(
-  '/events',
-  async (request, response) => {
-    try {
-      // 시간 범위 Query Parameter 변환
-      const from = parseTimestamp(
-        request.query.from,
-        'from',
-      );
+securityEventRouter.get('/events', async (request, response) => {
+  try {
+    // 시간 범위 Query Parameter 변환
+    const from = parseTimestamp(request.query.from, 'from');
+    const to = parseTimestamp(request.query.to, 'to');
 
-      const to = parseTimestamp(
-        request.query.to,
-        'to',
-      );
+    // 시작 시각과 종료 시각 순서 검증
+    validateTimeRange(from, to);
 
-      // 시작 시각과 종료 시각 순서 검증
-      validateTimeRange(from, to);
+    // 필수 조회 조건 생성
+    const query: SecurityEventQuery = {
+      limit: parseLimit(request.query.limit),
+    };
 
-      // 필수 조회 조건 생성
-      const query: SecurityEventQuery = {
-        limit: parseLimit(request.query.limit),
-      };
+    // 선택 조회 조건 변환
+    const eventType = parseEventType(request.query.eventType);
 
-      // 선택 조회 조건 변환
-      const eventType = parseEventType(
-        request.query.eventType,
-      );
+    const sourceIp = getOptionalQueryValue(
+      request.query.sourceIp,
+      'sourceIp',
+    );
 
-      const sourceIp = getOptionalQueryValue(
-        request.query.sourceIp,
-        'sourceIp',
-      );
+    const deviceId = getOptionalQueryValue(
+      request.query.deviceId,
+      'deviceId',
+    );
 
-      const deviceId = getOptionalQueryValue(
-        request.query.deviceId,
-        'deviceId',
-      );
-
-      // 전달된 조회 조건만 Repository에 전달
-      if (eventType !== undefined) {
-        query.eventType = eventType;
-      }
-
-      if (sourceIp !== undefined) {
-        query.sourceIp = sourceIp;
-      }
-
-      if (deviceId !== undefined) {
-        query.deviceId = deviceId;
-      }
-
-      if (from !== undefined) {
-        query.from = from;
-      }
-
-      if (to !== undefined) {
-        query.to = to;
-      }
-
-      // 조건별 SecurityEvent 조회
-      const items = await findSecurityEvents(query);
-
-      response.status(200).json({
-        count: items.length,
-        items,
-      });
-    } catch (error) {
-      sendQueryError(response, error);
+    // 전달된 조회 조건만 Repository에 전달
+    if (eventType !== undefined) {
+      query.eventType = eventType;
     }
-  },
-);
+
+    if (sourceIp !== undefined) {
+      // 원본 IP 또는 기존 익명 식별자를 저장값 형식으로 변환
+      query.sourceIp = privacyProtector.protectSourceIp(sourceIp);
+    }
+
+    if (deviceId !== undefined) {
+      query.deviceId = deviceId;
+    }
+
+    if (from !== undefined) {
+      query.from = from;
+    }
+
+    if (to !== undefined) {
+      query.to = to;
+    }
+
+    // 조건별 SecurityEvent 조회
+    const items = await findSecurityEvents(query);
+
+    response.status(200).json({
+      count: items.length,
+      items,
+    });
+  } catch (error) {
+    sendQueryError(response, error);
+  }
+});
 
 /**
  * eventId 기준 SecurityEvent 조회
@@ -351,15 +315,8 @@ securityEventRouter.get(
   async (request, response) => {
     try {
       // 시간 범위 Query Parameter 변환
-      const from = parseTimestamp(
-        request.query.from,
-        'from',
-      );
-
-      const to = parseTimestamp(
-        request.query.to,
-        'to',
-      );
+      const from = parseTimestamp(request.query.from, 'from');
+      const to = parseTimestamp(request.query.to, 'to');
 
       // 시작 시각과 종료 시각 순서 검증
       validateTimeRange(from, to);
@@ -371,9 +328,7 @@ securityEventRouter.get(
       };
 
       // Rule Hit 선택 조회 조건 변환
-      const severity = parseSeverity(
-        request.query.severity,
-      );
+      const severity = parseSeverity(request.query.severity);
 
       const ruleId = getOptionalQueryValue(
         request.query.ruleId,
@@ -400,7 +355,8 @@ securityEventRouter.get(
       }
 
       if (sourceIp !== undefined) {
-        query.sourceIp = sourceIp;
+        // 원본 IP 또는 기존 익명 식별자를 저장값 형식으로 변환
+        query.sourceIp = privacyProtector.protectSourceIp(sourceIp);
       }
 
       if (deviceId !== undefined) {
