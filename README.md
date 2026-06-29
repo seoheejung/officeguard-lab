@@ -2,6 +2,8 @@
 
 > Main PC에 보안 관측 서버를 구성하고, Mini PC의 네트워크 및 단말 이벤트를 단일 Agent 실행 파일로 수집·분석하는 홈랩 프로젝트
 
+[🌐 **프로젝트 정리 HTML**](https://seoheejung.github.io/officeguard-lab/)
+
 ## 프로젝트 개요
 
 **OfficeGuard Lab**은 Mini PC에서 발생한 DNS, Network Flow, Process, File, USB, Print Event를 수집하고 Main PC에서 저장·분석·시각화하는 보안 관측 프로젝트다.
