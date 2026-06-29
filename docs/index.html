@@ -1,0 +1,1743 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="dark" />
+  <title>OfficeGuard Lab — 최종 프로젝트 정리</title>
+  <style>
+    :root {
+      --bg: #07100d;
+      --panel: #0c1814;
+      --panel-2: #10211b;
+      --line: rgba(138, 255, 190, 0.22);
+      --line-strong: rgba(138, 255, 190, 0.48);
+      --text: #ecfff4;
+      --muted: #9fb9aa;
+      --green: #78f0aa;
+      --green-2: #31c879;
+      --amber: #ffc861;
+      --red: #ff7f7f;
+      --blue: #75c9ff;
+      --shadow: 0 28px 80px rgba(0, 0, 0, 0.38);
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: #030806;
+      color: var(--text);
+      font-family: Inter, Pretendard, "Noto Sans KR", "Malgun Gothic", system-ui, -apple-system, sans-serif;
+    }
+
+    button { font: inherit; }
+
+    .deck {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+      background:
+        radial-gradient(circle at 16% 14%, rgba(49, 200, 121, 0.12), transparent 30%),
+        radial-gradient(circle at 84% 78%, rgba(117, 201, 255, 0.08), transparent 28%),
+        #030806;
+    }
+
+    .slide {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      gap: clamp(18px, 2.1vh, 28px);
+      width: 100%;
+      height: 100%;
+      padding: clamp(34px, 5.2vh, 66px) clamp(42px, 6vw, 112px) clamp(28px, 4.5vh, 54px);
+      opacity: 0;
+      pointer-events: none;
+      transform: translateX(44px) scale(0.985);
+      transition: opacity 280ms ease, transform 360ms cubic-bezier(.2,.8,.2,1);
+      isolation: isolate;
+    }
+
+    .slide::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      z-index: -2;
+      background-image:
+        linear-gradient(rgba(120, 240, 170, 0.035) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(120, 240, 170, 0.035) 1px, transparent 1px);
+      background-size: 42px 42px;
+      mask-image: linear-gradient(to bottom, rgba(0,0,0,.8), transparent 88%);
+    }
+
+    .slide::after {
+      content: "";
+      position: absolute;
+      left: clamp(42px, 6vw, 112px);
+      right: clamp(42px, 6vw, 112px);
+      bottom: 22px;
+      height: 1px;
+      z-index: -1;
+      background: linear-gradient(90deg, transparent, var(--line), transparent);
+    }
+
+    .slide.active {
+      opacity: 1;
+      pointer-events: auto;
+      transform: translateX(0) scale(1);
+    }
+
+    .slide.exit-left { transform: translateX(-44px) scale(0.985); }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      color: var(--green);
+      font-size: clamp(12px, 1.05vw, 16px);
+      font-weight: 800;
+      letter-spacing: .16em;
+      text-transform: uppercase;
+    }
+
+    .eyebrow::before {
+      content: "";
+      width: 26px;
+      height: 2px;
+      background: var(--green);
+      box-shadow: 0 0 18px rgba(120,240,170,.7);
+    }
+
+    h1, h2, h3, p { margin: 0; }
+
+    h1 {
+      max-width: 1100px;
+      font-size: clamp(48px, 7vw, 112px);
+      line-height: .98;
+      letter-spacing: -.055em;
+      font-weight: 900;
+    }
+
+    h2 {
+      font-size: clamp(34px, 4.25vw, 68px);
+      line-height: 1.06;
+      letter-spacing: -.045em;
+      font-weight: 900;
+    }
+
+    h3 {
+      font-size: clamp(18px, 1.55vw, 26px);
+      line-height: 1.25;
+      font-weight: 850;
+    }
+
+    .lead {
+      max-width: 980px;
+      color: #cce5d7;
+      font-size: clamp(18px, 1.8vw, 30px);
+      line-height: 1.55;
+      letter-spacing: -.018em;
+    }
+
+    .muted { color: var(--muted); }
+    .accent { color: var(--green); }
+    .amber { color: var(--amber); }
+    .red { color: var(--red); }
+    .blue { color: var(--blue); }
+
+    .header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 32px;
+    }
+
+    .header-copy {
+      display: grid;
+      gap: 14px;
+    }
+
+    .slide-no {
+      flex: 0 0 auto;
+      color: var(--muted);
+      font: 700 clamp(12px, 1vw, 15px)/1 ui-monospace, SFMono-Regular, Consolas, monospace;
+      letter-spacing: .14em;
+      padding-top: 7px;
+    }
+
+    .footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+      color: #789486;
+      font-size: clamp(10px, .85vw, 13px);
+      letter-spacing: .04em;
+    }
+
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 800;
+      color: #a7c5b5;
+    }
+
+    .brand-mark {
+      width: 18px;
+      height: 18px;
+      border: 2px solid var(--green);
+      border-radius: 5px;
+      position: relative;
+      box-shadow: 0 0 14px rgba(120,240,170,.25);
+    }
+
+    .brand-mark::after {
+      content: "";
+      position: absolute;
+      inset: 4px;
+      border: 1px solid var(--green);
+      border-radius: 2px;
+    }
+
+    .hero {
+      align-content: center;
+      grid-template-rows: 1fr auto;
+    }
+
+    .hero::before {
+      background-size: 54px 54px;
+      opacity: .72;
+    }
+
+    .hero-content {
+      display: grid;
+      align-content: center;
+      gap: clamp(22px, 3vh, 34px);
+    }
+
+    .hero h1 .subline {
+      display: block;
+      margin-top: .18em;
+      font-size: .46em;
+      line-height: 1.25;
+      letter-spacing: -.035em;
+      color: #b7d5c5;
+      font-weight: 720;
+    }
+
+    .hero-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 2px;
+    }
+
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      min-height: 34px;
+      padding: 7px 13px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: rgba(12, 24, 20, .72);
+      color: #bfd8ca;
+      font-size: clamp(11px, .95vw, 14px);
+      font-weight: 700;
+      backdrop-filter: blur(8px);
+    }
+
+    .hero-orbit {
+      position: absolute;
+      right: 7vw;
+      top: 15vh;
+      width: min(29vw, 450px);
+      aspect-ratio: 1;
+      border: 1px solid rgba(120,240,170,.15);
+      border-radius: 50%;
+      z-index: -1;
+      box-shadow: inset 0 0 80px rgba(120,240,170,.05), 0 0 110px rgba(120,240,170,.06);
+    }
+
+    .hero-orbit::before,
+    .hero-orbit::after {
+      content: "";
+      position: absolute;
+      border-radius: 50%;
+      border: 1px solid rgba(120,240,170,.17);
+    }
+
+    .hero-orbit::before { inset: 13%; }
+    .hero-orbit::after { inset: 31%; background: rgba(49,200,121,.06); }
+
+    .content {
+      min-height: 0;
+      display: grid;
+      align-content: center;
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: clamp(16px, 2vw, 28px);
+    }
+
+    .grid-3 {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: clamp(14px, 1.5vw, 22px);
+    }
+
+    .grid-4 {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: clamp(12px, 1.25vw, 18px);
+    }
+
+    .card {
+      position: relative;
+      overflow: hidden;
+      padding: clamp(18px, 2vw, 28px);
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      background: linear-gradient(145deg, rgba(16,33,27,.9), rgba(7,16,13,.94));
+      box-shadow: var(--shadow);
+    }
+
+    .card::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, var(--green), transparent);
+      opacity: .55;
+    }
+
+    .card p {
+      margin-top: 12px;
+      color: var(--muted);
+      font-size: clamp(13px, 1.1vw, 17px);
+      line-height: 1.6;
+    }
+
+    .metric {
+      display: grid;
+      gap: 9px;
+    }
+
+    .metric-value {
+      color: var(--green);
+      font-size: clamp(34px, 4vw, 66px);
+      font-weight: 900;
+      line-height: 1;
+      letter-spacing: -.05em;
+    }
+
+    .metric-label {
+      color: #d8eee2;
+      font-size: clamp(14px, 1.15vw, 18px);
+      font-weight: 800;
+    }
+
+    .metric-note {
+      color: var(--muted);
+      font-size: clamp(11px, .9vw, 14px);
+      line-height: 1.5;
+    }
+
+    .flow {
+      display: grid;
+      grid-template-columns: 1fr auto 1.35fr auto 1fr;
+      align-items: stretch;
+      gap: clamp(9px, 1vw, 14px);
+    }
+
+    .flow-node {
+      display: grid;
+      align-content: center;
+      gap: 12px;
+      min-height: 250px;
+      padding: clamp(18px, 2.3vw, 30px);
+      border: 1px solid var(--line);
+      border-radius: 22px;
+      background: rgba(12, 24, 20, .88);
+      box-shadow: var(--shadow);
+    }
+
+    .flow-node.main {
+      border-color: var(--line-strong);
+      background: linear-gradient(145deg, rgba(16,41,31,.96), rgba(8,19,15,.96));
+    }
+
+    .flow-node small {
+      color: var(--green);
+      font-weight: 850;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+    }
+
+    .flow-node ul,
+    .clean-list {
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .flow-node li,
+    .clean-list li {
+      position: relative;
+      padding-left: 18px;
+      color: #c2d9cd;
+      font-size: clamp(12px, 1vw, 16px);
+      line-height: 1.65;
+    }
+
+    .flow-node li::before,
+    .clean-list li::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: .72em;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 10px rgba(120,240,170,.6);
+    }
+
+    .arrow {
+      align-self: center;
+      color: var(--green);
+      font-size: clamp(26px, 3vw, 46px);
+      opacity: .82;
+    }
+
+    .pipeline {
+      display: grid;
+      gap: 14px;
+    }
+
+    .pipeline-row {
+      display: grid;
+      grid-template-columns: repeat(7, minmax(0, 1fr));
+      align-items: center;
+      gap: 10px;
+    }
+
+    .pipe-box {
+      display: grid;
+      place-items: center;
+      min-height: 92px;
+      padding: 12px;
+      text-align: center;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: rgba(12,24,20,.9);
+      color: #d7eee1;
+      font-weight: 820;
+      font-size: clamp(12px, 1vw, 15px);
+      line-height: 1.35;
+    }
+
+    .pipe-box.hot {
+      border-color: var(--line-strong);
+      background: rgba(21,48,36,.92);
+      color: var(--green);
+    }
+
+    .pipe-arrow {
+      text-align: center;
+      color: var(--green);
+      font-size: 24px;
+    }
+
+    .branch-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 18px;
+      margin-top: 4px;
+    }
+
+    .branch {
+      padding: 18px 20px;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: rgba(8,18,14,.8);
+    }
+
+    .branch strong {
+      display: block;
+      margin-bottom: 8px;
+      color: var(--green);
+      font-size: clamp(14px, 1.15vw, 18px);
+    }
+
+    .branch span {
+      color: var(--muted);
+      font-size: clamp(12px, 1vw, 15px);
+      line-height: 1.55;
+    }
+
+    .event-cloud {
+      display: flex;
+      flex-wrap: wrap;
+      align-content: center;
+      gap: 10px;
+    }
+
+    .event-tag {
+      padding: 10px 13px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: rgba(10,22,17,.88);
+      color: #d3eadd;
+      font: 750 clamp(11px, .92vw, 14px)/1 ui-monospace, SFMono-Regular, Consolas, monospace;
+    }
+
+    .event-tag.rule {
+      border-color: rgba(255,200,97,.42);
+      color: var(--amber);
+    }
+
+    .rule-table {
+      display: grid;
+      gap: 10px;
+    }
+
+    .rule-row {
+      display: grid;
+      grid-template-columns: 1.55fr .8fr 2.35fr auto;
+      align-items: center;
+      gap: 16px;
+      min-height: 62px;
+      padding: 12px 16px;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: rgba(10,22,17,.86);
+    }
+
+    .rule-id {
+      color: #ddf3e7;
+      font: 780 clamp(11px, .92vw, 14px)/1.2 ui-monospace, SFMono-Regular, Consolas, monospace;
+    }
+
+    .severity {
+      justify-self: start;
+      padding: 6px 9px;
+      border-radius: 999px;
+      font-size: clamp(10px, .8vw, 12px);
+      font-weight: 900;
+      letter-spacing: .08em;
+    }
+
+    .severity.medium { background: rgba(255,200,97,.13); color: var(--amber); border: 1px solid rgba(255,200,97,.35); }
+    .severity.high { background: rgba(255,127,127,.12); color: var(--red); border: 1px solid rgba(255,127,127,.34); }
+
+    .rule-cond {
+      color: var(--muted);
+      font-size: clamp(12px, 1vw, 15px);
+      line-height: 1.45;
+    }
+
+    .status {
+      justify-self: end;
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      color: var(--green);
+      font-size: clamp(11px, .9vw, 13px);
+      font-weight: 850;
+      white-space: nowrap;
+    }
+
+    .status::before {
+      content: "";
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 12px rgba(120,240,170,.7);
+    }
+
+    .privacy-flow {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr auto 1fr;
+      gap: 12px;
+      align-items: stretch;
+      margin-bottom: 22px;
+    }
+
+    .privacy-box {
+      display: grid;
+      align-content: center;
+      gap: 8px;
+      min-height: 130px;
+      padding: 18px;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: rgba(10,22,17,.88);
+      text-align: center;
+    }
+
+    .privacy-box strong { color: #e1f6ea; font-size: clamp(16px, 1.35vw, 22px); }
+    .privacy-box span { color: var(--muted); font-size: clamp(12px, 1vw, 15px); line-height: 1.45; }
+
+    .dashboard {
+      display: grid;
+      grid-template-columns: 1.5fr .95fr;
+      gap: 18px;
+      min-height: 0;
+    }
+
+    .dash-shell {
+      display: grid;
+      grid-template-rows: auto 1fr;
+      min-height: 0;
+      border: 1px solid var(--line-strong);
+      border-radius: 22px;
+      overflow: hidden;
+      background: #07110d;
+      box-shadow: var(--shadow);
+    }
+
+    .dash-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 13px 16px;
+      border-bottom: 1px solid var(--line);
+      background: #0b1a14;
+      color: #b9d1c4;
+      font: 700 clamp(10px, .85vw, 13px)/1 ui-monospace, SFMono-Regular, Consolas, monospace;
+    }
+
+    .live-dot {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      color: var(--green);
+    }
+
+    .live-dot::before {
+      content: "";
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 14px rgba(120,240,170,.8);
+    }
+
+    .dash-body {
+      display: grid;
+      grid-template-columns: 1.35fr 1fr;
+      gap: 12px;
+      padding: 14px;
+      min-height: 0;
+    }
+
+    .dash-col { display: grid; gap: 12px; min-height: 0; }
+    .dash-panel {
+      min-height: 0;
+      padding: 14px;
+      border: 1px solid rgba(120,240,170,.15);
+      border-radius: 13px;
+      background: rgba(11,27,20,.76);
+    }
+
+    .dash-panel h4 {
+      margin: 0 0 12px;
+      color: #9fc0af;
+      font-size: clamp(10px, .82vw, 13px);
+      letter-spacing: .09em;
+      text-transform: uppercase;
+    }
+
+    .timeline-row {
+      display: grid;
+      grid-template-columns: 78px 1fr auto;
+      gap: 10px;
+      padding: 8px 0;
+      border-bottom: 1px solid rgba(120,240,170,.08);
+      color: #cce3d6;
+      font: 600 clamp(9px, .72vw, 12px)/1.3 ui-monospace, SFMono-Regular, Consolas, monospace;
+    }
+
+    .timeline-row:last-child { border-bottom: 0; }
+    .timeline-type { color: var(--green); }
+    .timeline-time { color: #6f9180; }
+
+    .bars { display: grid; gap: 11px; }
+    .bar-item { display: grid; gap: 5px; }
+    .bar-head { display: flex; justify-content: space-between; color: #b8d1c4; font-size: clamp(9px, .72vw, 12px); }
+    .bar-track { height: 8px; border-radius: 999px; background: rgba(255,255,255,.055); overflow: hidden; }
+    .bar-fill { height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--green-2), var(--green)); }
+
+    .result-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .result-card {
+      display: grid;
+      align-content: start;
+      gap: 10px;
+      min-height: 142px;
+      padding: 18px;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: rgba(10,22,17,.86);
+    }
+
+    .result-card .check {
+      display: grid;
+      place-items: center;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      color: #041009;
+      background: var(--green);
+      font-weight: 950;
+      box-shadow: 0 0 16px rgba(120,240,170,.3);
+    }
+
+    .result-card strong {
+      color: #e3f8eb;
+      font-size: clamp(14px, 1.1vw, 18px);
+      line-height: 1.35;
+    }
+
+    .result-card span {
+      color: var(--muted);
+      font-size: clamp(11px, .9vw, 14px);
+      line-height: 1.45;
+    }
+
+    .phase-line {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .phase-block {
+      padding: 20px;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: rgba(10,22,17,.86);
+    }
+
+    .phase-range {
+      color: var(--green);
+      font: 850 clamp(12px, 1vw, 15px)/1 ui-monospace, SFMono-Regular, Consolas, monospace;
+      letter-spacing: .06em;
+    }
+
+    .phase-block h3 { margin-top: 11px; }
+    .phase-block p { margin-top: 9px; color: var(--muted); font-size: clamp(11px, .93vw, 14px); line-height: 1.5; }
+
+    .scope-grid {
+      display: grid;
+      grid-template-columns: 1.1fr .9fr;
+      gap: 22px;
+    }
+
+    .callout {
+      padding: 22px;
+      border: 1px solid rgba(255,200,97,.28);
+      border-radius: 18px;
+      background: rgba(42,31,12,.22);
+    }
+
+    .callout h3 { color: var(--amber); }
+    .callout p { margin-top: 9px; color: #d6c7a8; font-size: clamp(12px, 1vw, 15px); line-height: 1.6; }
+
+    .final-statement {
+      display: grid;
+      align-content: center;
+      gap: 28px;
+      max-width: 1150px;
+    }
+
+    .final-statement h2 {
+      font-size: clamp(42px, 5.6vw, 88px);
+    }
+
+    .final-box {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 18px;
+      align-items: start;
+      padding: 22px 24px;
+      border: 1px solid var(--line-strong);
+      border-radius: 18px;
+      background: rgba(13,30,23,.88);
+    }
+
+    .final-box .index {
+      color: var(--green);
+      font: 900 clamp(20px, 2vw, 30px)/1 ui-monospace, SFMono-Regular, Consolas, monospace;
+    }
+
+    .final-box strong { display: block; font-size: clamp(17px, 1.45vw, 23px); }
+    .final-box span { display: block; margin-top: 7px; color: var(--muted); font-size: clamp(12px, 1vw, 15px); line-height: 1.5; }
+
+    .nav {
+      position: fixed;
+      right: 22px;
+      bottom: 20px;
+      z-index: 50;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px;
+      border: 1px solid rgba(120,240,170,.2);
+      border-radius: 999px;
+      background: rgba(4,11,8,.75);
+      backdrop-filter: blur(12px);
+    }
+
+    .nav button {
+      display: grid;
+      place-items: center;
+      width: 34px;
+      height: 34px;
+      border: 0;
+      border-radius: 50%;
+      background: rgba(120,240,170,.08);
+      color: #cbe5d7;
+      cursor: pointer;
+    }
+
+    .nav button:hover { background: rgba(120,240,170,.18); color: var(--green); }
+    .nav button:disabled { opacity: .28; cursor: default; }
+
+    .counter {
+      min-width: 62px;
+      text-align: center;
+      color: #a8c3b4;
+      font: 750 12px/1 ui-monospace, SFMono-Regular, Consolas, monospace;
+    }
+
+    .progress {
+      position: fixed;
+      left: 0;
+      bottom: 0;
+      z-index: 55;
+      height: 3px;
+      width: 0;
+      background: linear-gradient(90deg, var(--green-2), var(--green));
+      box-shadow: 0 0 18px rgba(120,240,170,.55);
+      transition: width 280ms ease;
+    }
+
+    .help {
+      position: fixed;
+      left: 22px;
+      bottom: 17px;
+      z-index: 50;
+      color: rgba(166,195,179,.58);
+      font-size: 11px;
+      letter-spacing: .04em;
+    }
+
+
+
+    .insight-band {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 18px;
+      align-items: center;
+      margin-top: 20px;
+      padding: 20px 22px;
+      border: 1px solid var(--line-strong);
+      border-radius: 18px;
+      background: linear-gradient(90deg, rgba(31,73,52,.55), rgba(9,22,16,.88));
+    }
+
+    .insight-index {
+      color: var(--green);
+      font: 900 clamp(22px, 2.4vw, 38px)/1 ui-monospace, SFMono-Regular, Consolas, monospace;
+    }
+
+    .insight-band strong {
+      display: block;
+      color: #e5faed;
+      font-size: clamp(16px, 1.35vw, 22px);
+      line-height: 1.35;
+    }
+
+    .insight-band span {
+      display: block;
+      margin-top: 6px;
+      color: var(--muted);
+      font-size: clamp(12px, 1vw, 15px);
+      line-height: 1.5;
+    }
+
+    .collector-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .collector-card {
+      min-height: 154px;
+      padding: 18px;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: rgba(10,22,17,.86);
+    }
+
+    .collector-kind {
+      display: inline-flex;
+      margin-bottom: 10px;
+      padding: 5px 8px;
+      border: 1px solid rgba(120,240,170,.28);
+      border-radius: 8px;
+      color: var(--green);
+      background: rgba(120,240,170,.06);
+      font: 800 clamp(10px, .78vw, 12px)/1 ui-monospace, SFMono-Regular, Consolas, monospace;
+      letter-spacing: .06em;
+    }
+
+    .collector-card h3 {
+      font-size: clamp(15px, 1.2vw, 20px);
+    }
+
+    .collector-card p {
+      margin-top: 8px;
+      color: var(--muted);
+      font-size: clamp(11px, .9vw, 14px);
+      line-height: 1.48;
+    }
+
+    .field-list {
+      margin-top: 10px;
+      color: #bcd5c7;
+      font: 650 clamp(10px, .78vw, 12px)/1.55 ui-monospace, SFMono-Regular, Consolas, monospace;
+    }
+
+    .api-layout {
+      display: grid;
+      grid-template-columns: .9fr 1.35fr;
+      gap: 18px;
+    }
+
+    .api-list {
+      display: grid;
+      gap: 10px;
+    }
+
+    .api-row {
+      display: grid;
+      grid-template-columns: auto 1.35fr 1fr;
+      align-items: center;
+      gap: 12px;
+      min-height: 58px;
+      padding: 11px 14px;
+      border: 1px solid var(--line);
+      border-radius: 13px;
+      background: rgba(10,22,17,.84);
+    }
+
+    .method {
+      padding: 5px 8px;
+      border-radius: 7px;
+      color: #06120b;
+      background: var(--green);
+      font: 900 clamp(10px, .78vw, 12px)/1 ui-monospace, SFMono-Regular, Consolas, monospace;
+    }
+
+    .endpoint {
+      color: #e2f6e9;
+      font: 760 clamp(11px, .9vw, 14px)/1.3 ui-monospace, SFMono-Regular, Consolas, monospace;
+    }
+
+    .api-desc {
+      color: var(--muted);
+      font-size: clamp(10px, .82vw, 13px);
+      line-height: 1.4;
+    }
+
+    .filter-cloud {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 14px;
+    }
+
+    .filter-tag {
+      padding: 7px 10px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      color: #bcd4c7;
+      background: rgba(6,16,11,.7);
+      font: 700 clamp(10px, .76vw, 12px)/1 ui-monospace, SFMono-Regular, Consolas, monospace;
+    }
+
+    .stack-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .stack-card {
+      min-height: 188px;
+      padding: 20px;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: rgba(10,22,17,.86);
+    }
+
+    .stack-card small {
+      color: var(--green);
+      font-weight: 850;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+    }
+
+    .stack-card h3 { margin-top: 10px; }
+
+    .stack-card p {
+      margin-top: 10px;
+      color: var(--muted);
+      font-size: clamp(11px, .9vw, 14px);
+      line-height: 1.55;
+    }
+
+    .deploy-line {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      align-items: center;
+      gap: 14px;
+      margin-top: 18px;
+      padding: 17px 20px;
+      border: 1px solid var(--line-strong);
+      border-radius: 17px;
+      background: rgba(13,31,23,.84);
+    }
+
+    .deploy-line strong { color: #e3f7ea; }
+    .deploy-line span { color: var(--muted); font-size: clamp(11px, .9vw, 14px); line-height: 1.45; }
+
+    .scenario-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .scenario-card {
+      position: relative;
+      min-height: 180px;
+      padding: 20px;
+      border: 1px solid var(--line);
+      border-radius: 17px;
+      background: rgba(10,22,17,.86);
+    }
+
+    .scenario-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .scenario-no {
+      color: var(--green);
+      font: 900 clamp(12px, .95vw, 15px)/1 ui-monospace, SFMono-Regular, Consolas, monospace;
+    }
+
+    .scenario-status {
+      padding: 5px 8px;
+      border-radius: 999px;
+      font-size: clamp(9px, .72vw, 11px);
+      font-weight: 900;
+      letter-spacing: .06em;
+      white-space: nowrap;
+    }
+
+    .scenario-status.ok { color: var(--green); border: 1px solid rgba(120,240,170,.34); background: rgba(120,240,170,.08); }
+    .scenario-status.partial { color: var(--amber); border: 1px solid rgba(255,200,97,.35); background: rgba(255,200,97,.08); }
+
+    .scenario-card h3 { margin-top: 10px; }
+
+    .scenario-flow {
+      margin-top: 12px;
+      color: #bdd5c8;
+      font: 650 clamp(10px, .82vw, 13px)/1.6 ui-monospace, SFMono-Regular, Consolas, monospace;
+    }
+
+    .soft-note {
+      margin-top: 16px;
+      padding: 14px 17px;
+      border-left: 3px solid var(--amber);
+      border-radius: 0 12px 12px 0;
+      background: rgba(50,35,11,.24);
+      color: #d9c9a8;
+      font-size: clamp(11px, .9vw, 14px);
+      line-height: 1.55;
+    }
+
+    @media (max-width: 980px), (max-aspect-ratio: 1/1) {
+      .slide { overflow-y: auto; padding: 34px 28px 54px; }
+      .slide::after { left: 28px; right: 28px; }
+      .grid-4, .result-grid, .phase-line, .stack-grid, .collector-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .grid-3 { grid-template-columns: 1fr; }
+      .flow { grid-template-columns: 1fr; }
+      .arrow { transform: rotate(90deg); justify-self: center; }
+      .flow-node { min-height: auto; }
+      .pipeline-row { grid-template-columns: 1fr; }
+      .pipe-arrow { transform: rotate(90deg); }
+      .privacy-flow { grid-template-columns: 1fr; }
+      .dashboard, .scope-grid, .api-layout, .scenario-grid { grid-template-columns: 1fr; }
+      .deploy-line { grid-template-columns: 1fr; }
+      .api-row { grid-template-columns: auto 1fr; }
+      .api-desc { grid-column: 1 / -1; }
+      .rule-row { grid-template-columns: 1fr; gap: 8px; }
+      .status { justify-self: start; }
+      .hero-orbit { display: none; }
+      .help { display: none; }
+    }
+
+    @media print {
+      html, body { overflow: visible; background: #fff; }
+      .deck { height: auto; background: #fff; }
+      .slide {
+        position: relative;
+        display: grid !important;
+        opacity: 1 !important;
+        transform: none !important;
+        pointer-events: auto;
+        width: 13.333in;
+        height: 7.5in;
+        page-break-after: always;
+        overflow: hidden;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+      .nav, .progress, .help { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <main class="deck" aria-label="OfficeGuard Lab 최종 발표 자료">
+
+    <section class="slide hero active" data-title="표지">
+      <div class="hero-content">
+        <span class="eyebrow">Final Project Summary</span>
+        <h1>
+          OfficeGuard Lab
+          <span class="subline">온프레미스 기반 네트워크·단말 보안 관측 시스템</span>
+        </h1>
+        <p class="lead">
+          Mini PC의 실제 네트워크·단말 이벤트를 수집하고,<br />
+          Main PC에서 중앙 저장·분석·보호·시각화한 홈랩 프로젝트
+        </p>
+        <div class="hero-chips" aria-label="기술 스택">
+          <span class="chip">Node.js · TypeScript</span>
+          <span class="chip">Apache Kafka</span>
+          <span class="chip">PostgreSQL</span>
+          <span class="chip">React · WebSocket</span>
+          <span class="chip">Windows Agent</span>
+        </div>
+      </div>
+      <div class="hero-orbit" aria-hidden="true"></div>
+      <div class="footer">
+        <span class="brand"><span class="brand-mark"></span> OfficeGuard Lab</span>
+        <span>Project Completion Deck</span>
+      </div>
+    </section>
+
+
+
+    <section class="slide" data-title="기획 배경">
+      <div class="header">
+        <div class="header-copy">
+          <span class="eyebrow">01 · Background</span>
+          <h2>개별 로그가 아니라<br /><span class="accent">중앙 이벤트 흐름</span>을 관측</h2>
+        </div>
+        <span class="slide-no">01 / 15</span>
+      </div>
+      <div class="content">
+        <div class="grid-3">
+          <article class="card">
+            <h3>관측 가능한 행위</h3>
+            <p>회사 단말과 네트워크에서는 DNS 요청, 외부 연결, 프로세스 실행, 파일 변경, USB 및 인쇄 사용이 이벤트로 기록될 수 있습니다.</p>
+          </article>
+          <article class="card">
+            <h3>중앙 처리 필요성</h3>
+            <p>모든 로그를 사람이 계속 확인하는 대신, 이벤트를 중앙에 축적하고 Rule 조건을 충족한 흐름을 우선 확인하는 구조가 필요합니다.</p>
+          </article>
+          <article class="card">
+            <h3>홈랩 재현 범위</h3>
+            <p>Main PC와 Mini PC를 분리해 수집 단말과 관측 서버의 역할을 재현하고, 허가된 내부망에서만 검증했습니다.</p>
+          </article>
+        </div>
+        <div class="insight-band">
+          <span class="insight-index">WHY</span>
+          <div>
+            <strong>OfficeGuard Lab은 감시 도구가 아니라 보안 이벤트 처리 구조를 학습하기 위한 프로젝트입니다.</strong>
+            <span>패킷 본문·계정 정보·개인 파일 내용은 수집하지 않고, 행위 판단에 필요한 메타데이터만 처리합니다.</span>
+          </div>
+        </div>
+      </div>
+      <div class="footer"><span class="brand"><span class="brand-mark"></span> OfficeGuard Lab</span><span>Endpoint + Network Metadata Observation</span></div>
+    </section>
+
+    <section class="slide" data-title="프로젝트 정의">
+      <div class="header">
+        <div class="header-copy">
+          <span class="eyebrow">02 · Project Definition</span>
+          <h2>실제 단말 행위를<br /><span class="accent">중앙 보안 이벤트</span>로 전환</h2>
+        </div>
+        <span class="slide-no">02 / 15</span>
+      </div>
+      <div class="content">
+        <div class="grid-3">
+          <article class="card metric">
+            <span class="metric-value">1</span>
+            <span class="metric-label">Mini PC Agent</span>
+            <span class="metric-note">설치·서비스 등록 없이 단일 실행 파일로 직접 실행</span>
+          </article>
+          <article class="card metric">
+            <span class="metric-value">10</span>
+            <span class="metric-label">수집 이벤트 타입</span>
+            <span class="metric-note">DNS, Flow, Process, File, USB, Print 메타데이터</span>
+          </article>
+          <article class="card metric">
+            <span class="metric-value">E2E</span>
+            <span class="metric-label">End-to-End 검증</span>
+            <span class="metric-note">수집 → Kafka → 분석 → 저장 → WebSocket → Dashboard</span>
+          </article>
+        </div>
+        <div class="card" style="margin-top:20px;">
+          <h3>핵심 목표</h3>
+          <p>
+            허가된 홈랩 환경에서 EDR·DLP 스타일의 기본 처리 구조를 단순화해 구현하고,
+            실제 Windows 이벤트가 중앙 관측 화면까지 전달되는 흐름을 재현했습니다.
+          </p>
+        </div>
+      </div>
+      <div class="footer"><span class="brand"><span class="brand-mark"></span> OfficeGuard Lab</span><span>허가된 홈랩 환경 · 메타데이터 중심</span></div>
+    </section>
+
+    <section class="slide" data-title="시스템 구조">
+      <div class="header">
+        <div class="header-copy">
+          <span class="eyebrow">03 · Architecture</span>
+          <h2>Mini PC와 Main PC의<br />명확한 <span class="accent">역할 분리</span></h2>
+        </div>
+        <span class="slide-no">03 / 15</span>
+      </div>
+      <div class="content">
+        <div class="flow">
+          <article class="flow-node">
+            <small>Mini PC</small>
+            <h3>검사 대상 테스트 단말</h3>
+            <ul>
+              <li>실제 DNS 요청 수집</li>
+              <li>Network Flow 수집</li>
+              <li>Process · File · USB · Print</li>
+              <li>SecurityEvent 정규화</li>
+            </ul>
+          </article>
+          <div class="arrow">→</div>
+          <article class="flow-node main">
+            <small>Main PC</small>
+            <h3>Security Observation Server</h3>
+            <ul>
+              <li>Event Receiver 검증</li>
+              <li>Kafka Event Pipeline</li>
+              <li>Rule-based Analyzer</li>
+              <li>Privacy Protector</li>
+              <li>PostgreSQL · REST · WebSocket</li>
+            </ul>
+          </article>
+          <div class="arrow">→</div>
+          <article class="flow-node">
+            <small>Operator View</small>
+            <h3>Realtime Dashboard</h3>
+            <ul>
+              <li>실시간 이벤트 타임라인</li>
+              <li>DNS 및 Source 통계</li>
+              <li>Rule Hit · Severity 현황</li>
+              <li>WebSocket 연결 상태</li>
+            </ul>
+          </article>
+        </div>
+      </div>
+      <div class="footer"><span class="brand"><span class="brand-mark"></span> OfficeGuard Lab</span><span>내부망 SecurityEvent 전송</span></div>
+    </section>
+
+
+
+    <section class="slide" data-title="Mini PC Agent">
+      <div class="header">
+        <div class="header-copy">
+          <span class="eyebrow">04 · Mini PC Agent</span>
+          <h2>하나의 실행 파일에서<br /><span class="accent">6개 수집 영역</span> 처리</h2>
+        </div>
+        <span class="slide-no">04 / 15</span>
+      </div>
+      <div class="content">
+        <div class="collector-grid">
+          <article class="collector-card"><span class="collector-kind">DNS</span><h3>DNS 요청 기록</h3><p>실제 도메인 조회 기록을 DNS_QUERY로 정규화</p><div class="field-list">sourceIp · domain · queryType</div></article>
+          <article class="collector-card"><span class="collector-kind">FLOW</span><h3>Network Flow</h3><p>패킷 본문 없이 연결 목적지 메타데이터 수집</p><div class="field-list">destinationIp · port · protocol</div></article>
+          <article class="collector-card"><span class="collector-kind">PROCESS</span><h3>프로세스 실행</h3><p>Mini PC에서 새로 시작된 프로세스 이벤트 변환</p><div class="field-list">processName · processId · path</div></article>
+          <article class="collector-card"><span class="collector-kind">FILE</span><h3>파일 변경</h3><p>감시 경로의 생성·수정·삭제 및 복사 흐름 관측</p><div class="field-list">path · sizeBytes · extension</div></article>
+          <article class="collector-card"><span class="collector-kind">USB</span><h3>USB 저장 장치</h3><p>연결·해제와 이동식 저장 장치 대상 파일 생성 감지</p><div class="field-list">vendor · productName · serialAlias</div></article>
+          <article class="collector-card"><span class="collector-kind">PRINT</span><h3>인쇄 요청</h3><p>실제 문서명 대신 보호된 별칭과 인쇄 메타데이터 사용</p><div class="field-list">printerName · documentAlias · pages</div></article>
+        </div>
+        <div class="soft-note"><strong>실행 원칙:</strong> 설치 프로그램 없음 · Windows Service 등록 없음 · 자동 시작 없음 · 은닉 실행 없음 · 사용자가 직접 실행 및 종료</div>
+      </div>
+      <div class="footer"><span class="brand"><span class="brand-mark"></span> OfficeGuard Lab</span><span>Single Executable · Manual Run</span></div>
+    </section>
+
+    <section class="slide" data-title="이벤트 처리 흐름">
+      <div class="header">
+        <div class="header-copy">
+          <span class="eyebrow">05 · Event Pipeline</span>
+          <h2>원본 분석과 보호 사본 저장을<br /><span class="accent">분리한 처리 흐름</span></h2>
+        </div>
+        <span class="slide-no">05 / 15</span>
+      </div>
+      <div class="content">
+        <div class="pipeline">
+          <div class="pipeline-row">
+            <div class="pipe-box">Mini PC<br />Agent</div><div class="pipe-arrow">→</div>
+            <div class="pipe-box">Event<br />Receiver</div><div class="pipe-arrow">→</div>
+            <div class="pipe-box hot">Kafka<br />Topic</div><div class="pipe-arrow">→</div>
+            <div class="pipe-box">Kafka<br />Consumer</div>
+          </div>
+          <div class="branch-grid">
+            <div class="branch">
+              <strong>원본 이벤트 경로</strong>
+              <span>Rule-based Analyzer 평가 → 조건 충족 시 RULE_HIT 생성 → 기존 Kafka Topic 재발행</span>
+            </div>
+            <div class="branch">
+              <strong>보호 사본 경로</strong>
+              <span>Source IP 익명화 · 민감 도메인 마스킹 → PostgreSQL 저장 · WebSocket 전달</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="footer"><span class="brand"><span class="brand-mark"></span> OfficeGuard Lab</span><span>원본 분석 · 보호 사본 저장/UI</span></div>
+    </section>
+
+    <section class="slide" data-title="수집 범위와 이벤트 모델">
+      <div class="header">
+        <div class="header-copy">
+          <span class="eyebrow">06 · Collection Scope</span>
+          <h2>패킷 본문이 아닌<br /><span class="accent">행위 메타데이터</span> 수집</h2>
+        </div>
+        <span class="slide-no">06 / 15</span>
+      </div>
+      <div class="content">
+        <div class="grid-2">
+          <div class="card">
+            <h3>SecurityEvent 수집 타입</h3>
+            <div class="event-cloud" style="margin-top:18px;">
+              <span class="event-tag">DNS_QUERY</span>
+              <span class="event-tag">NETWORK_FLOW</span>
+              <span class="event-tag">PROCESS_START</span>
+              <span class="event-tag">FILE_CREATED</span>
+              <span class="event-tag">FILE_MODIFIED</span>
+              <span class="event-tag">FILE_DELETED</span>
+              <span class="event-tag">FILE_COPIED</span>
+              <span class="event-tag">USB_CONNECTED</span>
+              <span class="event-tag">USB_DISCONNECTED</span>
+              <span class="event-tag">PRINT_REQUESTED</span>
+              <span class="event-tag rule">RULE_HIT</span>
+            </div>
+          </div>
+          <div class="card">
+            <h3>명시적 비수집 범위</h3>
+            <ul class="clean-list" style="margin-top:16px;">
+              <li>패킷 Payload 및 HTTPS 본문</li>
+              <li>계정 비밀번호 · Cookie · Token</li>
+              <li>메신저 내용 및 개인 파일 본문</li>
+              <li>키보드 입력 및 화면 캡처</li>
+              <li>원본 USB Serial Number · 실제 문서명</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+      <div class="footer"><span class="brand"><span class="brand-mark"></span> OfficeGuard Lab</span><span>Privacy-aware logging</span></div>
+    </section>
+
+
+
+    <section class="slide" data-title="Storage와 REST API">
+      <div class="header">
+        <div class="header-copy">
+          <span class="eyebrow">07 · Storage & REST API</span>
+          <h2>실시간 처리 이후에도<br /><span class="accent">조회 가능한 기록</span> 유지</h2>
+        </div>
+        <span class="slide-no">07 / 15</span>
+      </div>
+      <div class="content">
+        <div class="api-layout">
+          <article class="card">
+            <h3>PostgreSQL 저장 기준</h3>
+            <ul class="clean-list" style="margin-top:16px;">
+              <li>SecurityEvent와 RULE_HIT 저장</li>
+              <li>동일 eventId 중복 저장 방지</li>
+              <li>JSON metadata 구조 유지</li>
+              <li>stored_at 기준 보관 기간 정리</li>
+              <li>보호 설정이 적용된 사본 저장</li>
+            </ul>
+          </article>
+          <div class="api-list">
+            <div class="api-row"><span class="method">GET</span><span class="endpoint">/api/events</span><span class="api-desc">최근 이벤트 및 조건별 목록 조회</span></div>
+            <div class="api-row"><span class="method">GET</span><span class="endpoint">/api/events/:eventId</span><span class="api-desc">단일 이벤트 상세 조회</span></div>
+            <div class="api-row"><span class="method">GET</span><span class="endpoint">/api/rule-hits</span><span class="api-desc">Rule Hit 및 Severity 조건 조회</span></div>
+            <div class="filter-cloud" aria-label="지원 필터">
+              <span class="filter-tag">time range</span><span class="filter-tag">eventType</span><span class="filter-tag">sourceIp</span><span class="filter-tag">deviceId</span><span class="filter-tag">severity</span><span class="filter-tag">ruleId</span>
+            </div>
+          </div>
+        </div>
+        <div class="insight-band">
+          <span class="insight-index">ID</span>
+          <div><strong>Kafka, Storage, REST, WebSocket 전 구간에서 eventId를 공통 식별자로 사용</strong><span>원본 이벤트와 Rule Hit의 relatedEventIds 연결 관계를 유지하고, Dashboard 중복 표시도 eventId 기준으로 제거합니다.</span></div>
+        </div>
+      </div>
+      <div class="footer"><span class="brand"><span class="brand-mark"></span> OfficeGuard Lab</span><span>PostgreSQL · node-postgres · REST</span></div>
+    </section>
+
+    <section class="slide" data-title="탐지 규칙">
+      <div class="header">
+        <div class="header-copy">
+          <span class="eyebrow">08 · Rule-based Detection</span>
+          <h2>단일·연속·시간 범위<br /><span class="accent">이상 행위 탐지</span></h2>
+        </div>
+        <span class="slide-no">08 / 15</span>
+      </div>
+      <div class="content">
+        <div class="rule-table">
+          <div class="rule-row">
+            <span class="rule-id">LARGE_FILE_COPY_DETECTED</span>
+            <span class="severity medium">MEDIUM</span>
+            <span class="rule-cond">FILE_COPIED 크기가 설정 임계값 이상</span>
+            <span class="status">구현 · Mock 검증</span>
+          </div>
+          <div class="rule-row">
+            <span class="rule-id">USB_FILE_COPY_DETECTED</span>
+            <span class="severity high">HIGH</span>
+            <span class="rule-cond">USB 연결 후 동일 단말에서 파일 복사 발생</span>
+            <span class="status">구현 · Mock 검증</span>
+          </div>
+          <div class="rule-row">
+            <span class="rule-id">FILE_COPY_EXTERNAL_DOMAIN_DETECTED</span>
+            <span class="severity high">HIGH</span>
+            <span class="rule-cond">파일 복사 후 설정된 외부 대상 도메인 조회</span>
+            <span class="status">구현 · Mock 검증</span>
+          </div>
+          <div class="rule-row">
+            <span class="rule-id">DNS_QUERY_SPIKE_DETECTED</span>
+            <span class="severity medium">MEDIUM</span>
+            <span class="rule-cond">동일 Source IP의 일정 시간 내 DNS 요청량 임계값 도달</span>
+            <span class="status">실제 시연 검증</span>
+          </div>
+        </div>
+      </div>
+      <div class="footer"><span class="brand"><span class="brand-mark"></span> OfficeGuard Lab</span><span>RULE_HIT에 relatedEventIds 기록</span></div>
+    </section>
+
+    <section class="slide" data-title="개인정보 보호">
+      <div class="header">
+        <div class="header-copy">
+          <span class="eyebrow">09 · Privacy & Data Protection</span>
+          <h2>관측 가능성과 개인정보 보호의<br /><span class="accent">경계 설계</span></h2>
+        </div>
+        <span class="slide-no">09 / 15</span>
+      </div>
+      <div class="content">
+        <div class="privacy-flow">
+          <div class="privacy-box"><strong>원본 SecurityEvent</strong><span>Analyzer Rule 평가에 사용</span></div>
+          <div class="arrow">→</div>
+          <div class="privacy-box"><strong>Privacy Protector</strong><span>HMAC-SHA256 IP 익명화<br />민감 도메인 마스킹</span></div>
+          <div class="arrow">→</div>
+          <div class="privacy-box"><strong>보호 사본</strong><span>PostgreSQL · REST API<br />WebSocket · Dashboard</span></div>
+        </div>
+        <div class="grid-4">
+          <article class="card"><h3>일관된 익명 ID</h3><p>동일 Source IP를 동일한 익명 식별자로 변환</p></article>
+          <article class="card"><h3>도메인 마스킹</h3><p>등록 도메인과 하위 도메인의 metadata·message 보호</p></article>
+          <article class="card"><h3>보관 기간</h3><p>stored_at 기준 만료 이벤트 시작 시·주기별 정리</p></article>
+          <article class="card"><h3>접근 로그</h3><p>조회 API 접근 기록, Query String·응답 데이터 제외</p></article>
+        </div>
+      </div>
+      <div class="footer"><span class="brand"><span class="brand-mark"></span> OfficeGuard Lab</span><span>HMAC-SHA256 · Masking · Retention</span></div>
+    </section>
+
+    <section class="slide" data-title="Realtime Dashboard">
+      <div class="header">
+        <div class="header-copy">
+          <span class="eyebrow">10 · Realtime Dashboard</span>
+          <h2>저장 데이터와 신규 이벤트를<br /><span class="accent">하나의 관제 화면</span>으로</h2>
+        </div>
+        <span class="slide-no">10 / 15</span>
+      </div>
+      <div class="content">
+        <div class="dashboard">
+          <div class="dash-shell" aria-label="Dashboard 미리보기">
+            <div class="dash-top"><span>OFFICEGUARD // SECURITY OBSERVATION</span><span class="live-dot">WEBSOCKET CONNECTED</span></div>
+            <div class="dash-body">
+              <div class="dash-col">
+                <div class="dash-panel">
+                  <h4>Realtime Event Timeline</h4>
+                  <div class="timeline-row"><span class="timeline-time">05:21:03</span><span class="timeline-type">DNS_QUERY</span><span>github.com</span></div>
+                  <div class="timeline-row"><span class="timeline-time">05:21:05</span><span class="timeline-type">NETWORK_FLOW</span><span>1.1.1.1:53 / UDP</span></div>
+                  <div class="timeline-row"><span class="timeline-time">05:21:08</span><span class="timeline-type">PROCESS_START</span><span>nslookup.exe</span></div>
+                  <div class="timeline-row"><span class="timeline-time">05:21:14</span><span class="timeline-type amber">RULE_HIT</span><span>DNS_QUERY_SPIKE</span></div>
+                </div>
+                <div class="dash-panel">
+                  <h4>Rule Hits</h4>
+                  <div class="timeline-row"><span class="timeline-time">MEDIUM</span><span class="amber">DNS_QUERY_SPIKE_DETECTED</span><span>4 events</span></div>
+                </div>
+              </div>
+              <div class="dash-col">
+                <div class="dash-panel">
+                  <h4>DNS Domain Top 10</h4>
+                  <div class="bars">
+                    <div class="bar-item"><div class="bar-head"><span>github.com</span><span>42</span></div><div class="bar-track"><div class="bar-fill" style="width:88%"></div></div></div>
+                    <div class="bar-item"><div class="bar-head"><span>example.com</span><span>31</span></div><div class="bar-track"><div class="bar-fill" style="width:66%"></div></div></div>
+                    <div class="bar-item"><div class="bar-head"><span>mail.example.com</span><span>18</span></div><div class="bar-track"><div class="bar-fill" style="width:39%"></div></div></div>
+                  </div>
+                </div>
+                <div class="dash-panel">
+                  <h4>Event Type Count</h4>
+                  <div class="bars">
+                    <div class="bar-item"><div class="bar-head"><span>DNS_QUERY</span><span>58%</span></div><div class="bar-track"><div class="bar-fill" style="width:58%"></div></div></div>
+                    <div class="bar-item"><div class="bar-head"><span>NETWORK_FLOW</span><span>27%</span></div><div class="bar-track"><div class="bar-fill" style="width:27%"></div></div></div>
+                    <div class="bar-item"><div class="bar-head"><span>ENDPOINT</span><span>15%</span></div><div class="bar-track"><div class="bar-fill" style="width:15%"></div></div></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="grid-2" style="grid-template-columns:1fr;">
+            <article class="card"><h3>초기 조회</h3><p>REST API로 최근 SecurityEvent와 Rule Hit 로드</p></article>
+            <article class="card"><h3>실시간 반영</h3><p>WebSocket으로 신규 이벤트 즉시 추가</p></article>
+            <article class="card"><h3>중복 제거</h3><p>REST·WebSocket 데이터를 eventId 기준 병합</p></article>
+          </div>
+        </div>
+      </div>
+      <div class="footer"><span class="brand"><span class="brand-mark"></span> OfficeGuard Lab</span><span>React · Vite · Chart.js · WebSocket</span></div>
+    </section>
+
+
+
+    <section class="slide" data-title="기술 및 배포 구성">
+      <div class="header">
+        <div class="header-copy">
+          <span class="eyebrow">11 · Technology & Deployment</span>
+          <h2>수집 단말과 서버 인프라를<br /><span class="accent">서로 다른 실행 방식</span>으로 구성</h2>
+        </div>
+        <span class="slide-no">11 / 15</span>
+      </div>
+      <div class="content">
+        <div class="stack-grid">
+          <article class="stack-card"><small>Backend</small><h3>Node.js · TypeScript</h3><p>Express Event Receiver, Kafka Consumer, Rule Analyzer, REST API, WebSocket Server 구성</p></article>
+          <article class="stack-card"><small>Pipeline & Storage</small><h3>Kafka · PostgreSQL</h3><p>KRaft 단일 브로커 기반 이벤트 전달과 SecurityEvent·Rule Hit 영속화</p></article>
+          <article class="stack-card"><small>Dashboard</small><h3>React · Vite</h3><p>REST 초기 조회, WebSocket 실시간 반영, Chart.js 통계와 터미널형 관제 UI</p></article>
+          <article class="stack-card"><small>Agent</small><h3>Windows Executable</h3><p>Node.js SEA 기반 단일 실행 파일, 별도 설치 없이 .env 설정으로 Main PC Receiver 연결</p></article>
+        </div>
+        <div class="deploy-line">
+          <div><strong>Main PC</strong><br /><span>Docker Compose: Kafka · PostgreSQL · Backend · Dashboard</span></div>
+          <div class="arrow">↔</div>
+          <div><strong>Mini PC</strong><br /><span>officeguard-agent.exe 수동 실행 · 내부망 HTTP 전송</span></div>
+        </div>
+      </div>
+      <div class="footer"><span class="brand"><span class="brand-mark"></span> OfficeGuard Lab</span><span>Docker Compose + Single Executable Agent</span></div>
+    </section>
+
+    <section class="slide" data-title="구현 단계">
+      <div class="header">
+        <div class="header-copy">
+          <span class="eyebrow">12 · Delivery</span>
+          <h2>12개 Phase를 통한<br /><span class="accent">단계적 완성</span></h2>
+        </div>
+        <span class="slide-no">12 / 15</span>
+      </div>
+      <div class="content">
+        <div class="phase-line">
+          <article class="phase-block"><span class="phase-range">PHASE 1–4</span><h3>Foundation</h3><p>프로젝트 초기 구성, 이벤트 모델, Mock Generator, Kafka Pipeline</p></article>
+          <article class="phase-block"><span class="phase-range">PHASE 5–7</span><h3>Core Platform</h3><p>Rule Analyzer, PostgreSQL Storage, WebSocket & Dashboard</p></article>
+          <article class="phase-block"><span class="phase-range">PHASE 8–10</span><h3>Real Agent</h3><p>단일 실행 파일 Agent, DNS, Network Flow, Endpoint Event</p></article>
+          <article class="phase-block"><span class="phase-range">PHASE 11–12</span><h3>Protection & Demo</h3><p>Privacy 처리, 문서화, 실행 스크립트, 최종 시연</p></article>
+        </div>
+        <div class="card" style="margin-top:20px; display:flex; align-items:center; justify-content:space-between; gap:20px;">
+          <div><h3>Mock 기반 검증에서 실제 이벤트 수집으로 전환</h3><p>실제 DNS·Flow·Endpoint 수집 완료 후 Mock Event Generator 실행 경로 제거</p></div>
+          <span class="status" style="font-size:15px;">12 / 12 완료</span>
+        </div>
+      </div>
+      <div class="footer"><span class="brand"><span class="brand-mark"></span> OfficeGuard Lab</span><span>Foundation → Platform → Agent → Protection</span></div>
+    </section>
+
+
+
+    <section class="slide" data-title="시연 시나리오">
+      <div class="header">
+        <div class="header-copy">
+          <span class="eyebrow">13 · Demonstration</span>
+          <h2>실제 Mini PC 행위로<br /><span class="accent">수집과 탐지 흐름</span> 재현</h2>
+        </div>
+        <span class="slide-no">13 / 15</span>
+      </div>
+      <div class="content">
+        <div class="scenario-grid">
+          <article class="scenario-card"><div class="scenario-head"><span class="scenario-no">SCENARIO 01</span><span class="scenario-status ok">검증 성공</span></div><h3>DNS 요청 관측</h3><div class="scenario-flow">github.com 조회 → DNS_QUERY → Receiver → Kafka → PostgreSQL → WebSocket → Dashboard</div></article>
+          <article class="scenario-card"><div class="scenario-head"><span class="scenario-no">SCENARIO 02</span><span class="scenario-status ok">검증 성공</span></div><h3>DNS 요청량 급증</h3><div class="scenario-flow">다수 DNS 요청 → sourceIp별 시간 범위 집계 → DNS_QUERY_SPIKE_DETECTED → RULE_HIT 재발행</div></article>
+          <article class="scenario-card"><div class="scenario-head"><span class="scenario-no">SCENARIO 03</span><span class="scenario-status ok">검증 성공</span></div><h3>Network Flow 관측</h3><div class="scenario-flow">외부 연결 → NETWORK_FLOW → destinationIp · destinationPort · protocol 확인 → 저장·표시</div></article>
+          <article class="scenario-card"><div class="scenario-head"><span class="scenario-no">SCENARIO 04</span><span class="scenario-status partial">부분 검증</span></div><h3>USB 파일 복사 흐름</h3><div class="scenario-flow">USB 연결 → 파일 생성 감지 → FILE_COPIED 전송 성공 / 실제 Rule 조건 및 재현 범위는 별도 제한</div></article>
+        </div>
+        <div class="soft-note">최종 시연 결과는 입력 데이터와 설정 임계값을 기준으로 판단했습니다. 실행 흐름 성공과 Rule 조건 충족 여부를 구분해 기록했습니다.</div>
+      </div>
+      <div class="footer"><span class="brand"><span class="brand-mark"></span> OfficeGuard Lab</span><span>Actual Event Collection Demo</span></div>
+    </section>
+
+    <section class="slide" data-title="최종 검증 결과">
+      <div class="header">
+        <div class="header-copy">
+          <span class="eyebrow">14 · Final Verification</span>
+          <h2>최종 시연에서 확인한<br /><span class="accent">실제 동작 결과</span></h2>
+        </div>
+        <span class="slide-no">14 / 15</span>
+      </div>
+      <div class="content">
+        <div class="result-grid">
+          <article class="result-card"><span class="check">✓</span><strong>Main PC 인프라</strong><span>Kafka · PostgreSQL · Backend · Dashboard 정상 실행</span></article>
+          <article class="result-card"><span class="check">✓</span><strong>Mini PC Agent</strong><span>단일 실행 파일 및 내부망 Event Receiver 연결</span></article>
+          <article class="result-card"><span class="check">✓</span><strong>DNS 관측</strong><span>DNS_QUERY 생성·수신·저장·Dashboard 통계 반영</span></article>
+          <article class="result-card"><span class="check">✓</span><strong>DNS Spike 탐지</strong><span>RULE_HIT 생성 · Kafka 재발행 · REST 조회</span></article>
+          <article class="result-card"><span class="check">✓</span><strong>Network Flow</strong><span>UDP destinationIp · destinationPort · protocol 확인</span></article>
+          <article class="result-card"><span class="check">✓</span><strong>Storage & API</strong><span>SecurityEvent · Rule Hit 저장 및 조회</span></article>
+          <article class="result-card"><span class="check">✓</span><strong>Privacy</strong><span>HMAC-SHA256 기반 Source IP 익명화 적용</span></article>
+          <article class="result-card"><span class="check">✓</span><strong>Realtime Dashboard</strong><span>REST 초기 조회와 WebSocket 신규 이벤트 반영</span></article>
+        </div>
+      </div>
+      <div class="footer"><span class="brand"><span class="brand-mark"></span> OfficeGuard Lab</span><span>Phase 12 최종 실행 흐름 검증 완료</span></div>
+    </section>
+
+    <section class="slide" data-title="한계와 결론">
+      <div class="header">
+        <div class="header-copy">
+          <span class="eyebrow">15 · Boundary & Conclusion</span>
+          <h2>검증된 범위와<br /><span class="accent">검증하지 않은 범위</span>를 분리</h2>
+        </div>
+        <span class="slide-no">15 / 15</span>
+      </div>
+      <div class="content">
+        <div class="scope-grid">
+          <div class="final-statement">
+            <h2>실제 이벤트가<br />관측 화면까지 도달하는<br /><span class="accent">전체 경로를 구현</span></h2>
+            <div class="final-box">
+              <span class="index">01</span>
+              <div><strong>학습 목표 달성</strong><span>Agent 기반 수집, Kafka 스트림 처리, Rule 탐지, 저장, 실시간 UI, Privacy 경계를 하나의 시스템으로 연결했습니다.</span></div>
+            </div>
+          </div>
+          <div style="display:grid; gap:14px; align-content:center;">
+            <div class="callout"><h3>EMAIL_ATTACHMENT_SENT</h3><p>Phase 2 모델 정의 이력만 유지. Agent 수집·Receiver·Storage·Dashboard 구현 및 최종 시연 범위에서는 제외.</p></div>
+            <div class="callout"><h3>USB_FILE_COPY_DETECTED</h3><p>Rule 구현과 Phase 5 Mock 검증은 유지. 재현 가능한 실제 런타임 검증 방법이 없어 Phase 12 성공 항목에서는 제외.</p></div>
+            <div class="callout"><h3>대용량 파일 Rule</h3><p>최종 시연 입력은 50 bytes, 설정 임계값은 1,048,576 bytes. 파일 복사 흐름은 성공했지만 Rule 조건은 미충족.</p></div>
+          </div>
+        </div>
+      </div>
+      <div class="footer"><span class="brand"><span class="brand-mark"></span> OfficeGuard Lab</span><span>검증 결과 기준의 최종 정리</span></div>
+    </section>
+  </main>
+
+  <div class="help" aria-hidden="true">← → / Space / PgUp PgDn</div>
+  <nav class="nav" aria-label="슬라이드 이동">
+    <button id="prev" type="button" aria-label="이전 슬라이드">←</button>
+    <span class="counter" id="counter">1 / 16</span>
+    <button id="next" type="button" aria-label="다음 슬라이드">→</button>
+  </nav>
+  <div class="progress" id="progress" aria-hidden="true"></div>
+
+  <script>
+    (() => {
+      const slides = [...document.querySelectorAll('.slide')];
+      const prevButton = document.getElementById('prev');
+      const nextButton = document.getElementById('next');
+      const counter = document.getElementById('counter');
+      const progress = document.getElementById('progress');
+      let current = 0;
+      let wheelLocked = false;
+
+      const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
+
+      const render = (nextIndex, updateHash = true) => {
+        const previous = current;
+        current = clamp(nextIndex, 0, slides.length - 1);
+
+        slides.forEach((slide, index) => {
+          slide.classList.toggle('active', index === current);
+          slide.classList.toggle('exit-left', index < current);
+          slide.setAttribute('aria-hidden', index === current ? 'false' : 'true');
+        });
+
+        prevButton.disabled = current === 0;
+        nextButton.disabled = current === slides.length - 1;
+        counter.textContent = `${current + 1} / ${slides.length}`;
+        progress.style.width = `${((current + 1) / slides.length) * 100}%`;
+        document.title = `OfficeGuard Lab — ${slides[current].dataset.title}`;
+
+        if (updateHash && previous !== current) {
+          history.replaceState(null, '', `#${current + 1}`);
+        }
+      };
+
+      const goNext = () => render(current + 1);
+      const goPrev = () => render(current - 1);
+
+      prevButton.addEventListener('click', goPrev);
+      nextButton.addEventListener('click', goNext);
+
+      document.addEventListener('keydown', (event) => {
+        if (['ArrowRight', 'PageDown', ' '].includes(event.key)) {
+          event.preventDefault();
+          goNext();
+        } else if (['ArrowLeft', 'PageUp'].includes(event.key)) {
+          event.preventDefault();
+          goPrev();
+        } else if (event.key === 'Home') {
+          event.preventDefault();
+          render(0);
+        } else if (event.key === 'End') {
+          event.preventDefault();
+          render(slides.length - 1);
+        }
+      });
+
+      document.addEventListener('wheel', (event) => {
+        if (wheelLocked || Math.abs(event.deltaY) < 24) return;
+        wheelLocked = true;
+        event.deltaY > 0 ? goNext() : goPrev();
+        window.setTimeout(() => { wheelLocked = false; }, 450);
+      }, { passive: true });
+
+      let touchStartX = null;
+      document.addEventListener('touchstart', (event) => {
+        touchStartX = event.changedTouches[0]?.clientX ?? null;
+      }, { passive: true });
+      document.addEventListener('touchend', (event) => {
+        if (touchStartX === null) return;
+        const endX = event.changedTouches[0]?.clientX ?? touchStartX;
+        const delta = endX - touchStartX;
+        if (Math.abs(delta) > 60) delta < 0 ? goNext() : goPrev();
+        touchStartX = null;
+      }, { passive: true });
+
+      const hashIndex = Number.parseInt(location.hash.replace('#', ''), 10) - 1;
+      render(Number.isFinite(hashIndex) ? hashIndex : 0, false);
+    })();
+  </script>
+</body>
+</html>
